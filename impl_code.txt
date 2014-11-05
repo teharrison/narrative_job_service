@@ -13,6 +13,6 @@ use NarrativeJobService;
 
 
 #BEGIN hello
-$repsonse = "world";
+response = "world";
 #END hello
 

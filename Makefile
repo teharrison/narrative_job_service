@@ -89,8 +89,8 @@ deploy-mylibs:
 
 .PHONY : build-libs-service
 build-libs-service:
-	mkdir -p lib/Bio/KBase/AmethstService/
-	cp impl_code.txt lib/Bio/KBase/AmethstService/AmethstServiceImpl.pm
+	mkdir -p lib/Bio/KBase/${SERVICE_NAME}/
+	cp impl_code.txt lib/Bio/KBase/${SERVICE_NAME}/${SERVICE_NAME}Impl.pm
 	compile_typespec \
 		--psgi $(SERVICE_PSGI)  \
 		--impl Bio::KBase::$(SERVICE_NAME)::$(SERVICE_NAME)Impl \

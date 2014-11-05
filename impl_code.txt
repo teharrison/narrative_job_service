@@ -1,0 +1,18 @@
+#template for lib/Bio/KBase/NarrativeJobService/NarrativeJobServiceImpl.pm
+
+
+#BEGIN_HEADER
+use NarrativeJobService;
+#END_HEADER
+
+#BEGIN_CONSTRUCTOR
+	$self->{'instance'} = new NarrativeJobService(@args);
+#END_CONSTRUCTOR
+
+
+
+
+#BEGIN hello
+$repsonse = "world";
+#END hello
+

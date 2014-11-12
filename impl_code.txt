@@ -9,10 +9,20 @@ use NarrativeJobService;
 	$self->{'instance'} = new NarrativeJobService(@args);
 #END_CONSTRUCTOR
 
+#BEGIN run_app
+    $return = $self->{'instance'}->run_app($app, $user_name);
+#END run_app
 
+#BEGIN check_app_state
+    $return = $self->{'instance'}->check_app_state($job_id);
+#END check_app_state
 
+#BEGIN suspend_app
+    $return = $self->{'instance'}->suspend_app($job_id);
+#END suspend_app
 
-#BEGIN hello
-response = "world";
-#END hello
+#BEGIN delete_app
+    $return = $self->{'instance'}->delete_app($job_id);
+#END delete_app
+
 

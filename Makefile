@@ -39,10 +39,10 @@ deploy-all: deploy-client deploy-service
 # main targets
 
 .PHONY : deploy-client
-deploy-client: deploy-libs deploy-libs-client deploy-scripts
+deploy-client: deploy-libs deploy-scripts
 
 .PHONY : deploy-service
-deploy-service: deploy-libs deploy-libs-service deploy-cfg
+deploy-service: | build-libs deploy-libs deploy-cfg
 	mkdir -p $(TARGET)/services/$(SERVICE_DIR)
 	$(TPAGE) $(TPAGE_ARGS) service/start_service.tt > $(TARGET)/services/$(SERVICE_DIR)/start_service
 	chmod +x $(TARGET)/services/$(SERVICE_DIR)/start_service
@@ -52,24 +52,8 @@ deploy-service: deploy-libs deploy-libs-service deploy-cfg
 	chmod +x service/$(SERVICE_NAME).conf
 	echo "done executing deploy-service target"
 
-##########################################
-# deploy-libs targets
-
-.PHONY : deploy-libs-service
-deploy-libs-service: build-libs-service deploy-mylibs
-
-.PHONY : deploy-libs-client
-deploy-libs-client: deploy-mylibs
-
-.PHONY : deploy-mylibs
-deploy-mylibs: 
-	#example: rsync --exclude '*.bak*' -arv MG-RAST-Tools/tools/lib/. $(TARGET)/lib/.
-
-##########################################
-# build-libs targets
-
-.PHONY : build-libs-service
-build-libs-service:
+.PHONY : build-libs
+build-libs:
 	mkdir -p lib/Bio/KBase/${SERVICE_NAME}/
 	cp impl_code.txt lib/Bio/KBase/${SERVICE_NAME}/${SERVICE_NAME}Impl.pm
 	compile_typespec \

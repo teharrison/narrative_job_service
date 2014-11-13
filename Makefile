@@ -25,9 +25,6 @@ SRC_PERL = $(wildcard plbin/*.pl)
 ##########################################
 # default targets
 
-.PHONY : compile
-compile: initialize
-
 .PHONY : deploy
 deploy: deploy-all
 
@@ -56,11 +53,9 @@ deploy-service: deploy-libs deploy-libs-service deploy-cfg
 
 .PHONY : deploy-libs-service
 deploy-libs-service: build-libs-service deploy-mylibs
-	
 
 .PHONY : deploy-libs-client
 deploy-libs-client: deploy-mylibs
-	
 
 .PHONY : deploy-mylibs
 deploy-mylibs: 

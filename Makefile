@@ -25,6 +25,10 @@ SRC_PERL = $(wildcard plbin/*.pl)
 ##########################################
 # default targets
 
+.PHONY : default
+default:
+	echo "no default make target"
+
 .PHONY : deploy
 deploy: deploy-all
 

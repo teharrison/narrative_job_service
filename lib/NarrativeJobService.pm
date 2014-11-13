@@ -61,7 +61,7 @@ sub readConfig {
         die "error: deployment.cfg not found ($conf_file)";
     }
     my $cfg_full = Config::Simple->new($conf_file);
-    my $cfg = $cfg_full->param(-block=>'NarrativeJobService');
+    my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # workspace url
     unless (defined $self->{'ws_url'} && $self->{'ws_url'} ne '') {
         $self->{'ws_url'} = $cfg->{'ws-server'};

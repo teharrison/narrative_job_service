@@ -4,11 +4,10 @@ TARGET ?= /kb/deployment
 TOP_DIR = ../..
 include $(TOP_DIR)/tools/Makefile.common
 
-
 SERVICE_SPEC = NarrativeJobService.spec      
 SERVICE_NAME = NarrativeJobService
-SERVICE_PORT = 7118
-SERVICE_DIR  = NarrativeJob_service
+SERVICE_PORT = 8001
+SERVICE_DIR  = narrative_job_service
 
 ifeq ($(SELF_URL),)
 	SELF_URL = http://localhost:$(SERVICE_PORT)
@@ -23,11 +22,11 @@ WRAP_PERL_TOOL = wrap_perl
 WRAP_PERL_SCRIPT = bash $(TOOLS_DIR)/$(WRAP_PERL_TOOL).sh
 SRC_PERL = $(wildcard plbin/*.pl)
 
+##########################################
+# default targets
 
-# this is default target:
 .PHONY : compile
 compile: initialize
-
 
 .PHONY : deploy
 deploy: deploy-all
@@ -35,14 +34,11 @@ deploy: deploy-all
 .PHONY : deploy-all
 deploy-all: deploy-client deploy-service
 
-
 ##########################################
 # main targets
 
 .PHONY : deploy-client
 deploy-client: deploy-libs deploy-libs-client deploy-scripts
-
-
 
 .PHONY : deploy-service
 deploy-service: deploy-libs deploy-libs-service deploy-cfg
@@ -54,17 +50,6 @@ deploy-service: deploy-libs deploy-libs-service deploy-cfg
 	$(TPAGE) $(TPAGE_ARGS) service/upstart.tt > service/$(SERVICE_NAME).conf
 	chmod +x service/$(SERVICE_NAME).conf
 	echo "done executing deploy-service target"
-
-
-
-##########################################
-
-.PHONY : initialize
-initialize:
-	git submodule init
-	git submodule update
-	git submodule foreach git pull origin master
-
 
 ##########################################
 # deploy-libs targets
@@ -80,9 +65,6 @@ deploy-libs-client: deploy-mylibs
 .PHONY : deploy-mylibs
 deploy-mylibs: 
 	#example: rsync --exclude '*.bak*' -arv MG-RAST-Tools/tools/lib/. $(TARGET)/lib/.
-
-
-
 
 ##########################################
 # build-libs targets
@@ -101,14 +83,11 @@ build-libs-service:
 		--url $(SELF_URL) \
 		$(SERVICE_SPEC) lib
 
-
 ##########################################
 # test targets # requires /kb/deployment/user-env.sh to be sourced
 
-
 .PHONY : test
 test: test-client
-
 
 .PHONY : test-client
 test-client:
@@ -126,10 +105,7 @@ test-service:
 	fi
 	@echo test-service successful
 
-
 ##########################################
-
-
 
 include $(TOP_DIR)/tools/Makefile.common.rules
 

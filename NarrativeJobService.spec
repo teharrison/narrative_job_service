@@ -68,7 +68,7 @@ module NarrativeJobService {
         mapping<string, string> step_errors;
     } app_state;
 
-    funcdef run_app(app app, string user_name) returns (app_state) authentication required;
+    funcdef run_app(app app) returns (app_state) authentication required;
 
     funcdef check_app_state(string job_id) returns (app_state) authentication required;
     

@@ -12,17 +12,15 @@ use Data::Dumper;
 # set object variables from ENV
 sub new {
 	my ($class, %h) = @_;
-	if (defined($h{'shocktoken'}) && $h{'shocktoken'} eq '') {
-		$h{'shocktoken'} = undef;
-	}
 	my $self = {
-	    ws_url       => $ENV{'WS_SERVER_URL'},
-		awe_url      => $ENV{'AWE_SERVER_URL'},
-		shock_url	 => $ENV{'SHOCK_SERVER_URL'},
-		client_group => $ENV{'AWE_CLIENT_GROUP'},
-		ws_wrapper   => undef,
-		api_wrapper  => undef,
-		token	     => $h{'shocktoken'}
+	    ws_url        => $ENV{'WS_SERVER_URL'},
+		awe_url       => $ENV{'AWE_SERVER_URL'},
+		shock_url	  => $ENV{'SHOCK_SERVER_URL'},
+		client_group  => $ENV{'AWE_CLIENT_GROUP'},
+		ws_wrapper    => undef,
+		api_wrapper   => undef,
+		user_token	  => undef,
+		service_token => undef
 	};
 	bless $self, $class;
 	$self->readConfig();
@@ -53,12 +51,19 @@ sub api_wrapper {
     my ($self) = @_;
     return $self->{'api_wrapper'};
 }
-sub token {
+sub user_token {
     my ($self, $value) = @_;
     if (defined $value) {
-        $self->{'token'} = $value;
+        $self->{'user_token'} = $value;
     }
-    return $self->{'token'};
+    return $self->{'user_token'};
+}
+sub service_token {
+    my ($self, $value) = @_;
+    if (defined $value) {
+        $self->{'service_token'} = $value;
+    }
+    return $self->{'service_token'};
 }
 
 # replace object variables from config if don't exit
@@ -72,7 +77,7 @@ sub readConfig {
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'ws_wrapper', 'api_wrapper')) {
+    foreach my $val (('ws_url','awe_url','shock_url','client_group','ws_wrapper','api_wrapper','service_token')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
@@ -82,7 +87,7 @@ sub readConfig {
     }
 }
 
-### output ob below functions:
+### output of below functions:
 #{
 #    string job_id;
 #    string job_state;
@@ -110,5 +115,4 @@ sub delete_app {
     my ($self, $job_id) = @_;
     return {};
 }
-
 

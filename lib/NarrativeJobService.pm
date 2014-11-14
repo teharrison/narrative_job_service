@@ -8,7 +8,7 @@ use Config::Simple;
 use Data::Dumper;
 
 1;
-our $VERSION = '1.0.0';
+our $version = '1.0.0';
 
 # set object variables from ENV
 sub new {
@@ -103,7 +103,7 @@ sub readConfig {
 
 sub version {
     my ($self) = @_;
-    return $VERSION;
+    return $version;
 }
 
 sub run_app {

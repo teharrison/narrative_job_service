@@ -20,6 +20,8 @@ sub new {
 		awe_url      => $ENV{'AWE_SERVER_URL'},
 		shock_url	 => $ENV{'SHOCK_SERVER_URL'},
 		client_group => $ENV{'AWE_CLIENT_GROUP'},
+		ws_wrapper   => undef,
+		api_wrapper  => undef,
 		token	     => $h{'shocktoken'}
 	};
 	bless $self, $class;
@@ -43,6 +45,14 @@ sub client_group {
     my ($self) = @_;
     return $self->{'client_group'};
 }
+sub ws_wrapper {
+    my ($self) = @_;
+    return $self->{'ws_wrapper'};
+}
+sub api_wrapper {
+    my ($self) = @_;
+    return $self->{'api_wrapper'};
+}
 sub token {
     my ($self, $value) = @_;
     if (defined $value) {
@@ -61,32 +71,13 @@ sub readConfig {
     }
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
-    # workspace url
-    unless (defined $self->{'ws_url'} && $self->{'ws_url'} ne '') {
-        $self->{'ws_url'} = $cfg->{'ws-server'};
-        unless (defined($self->{'ws_url'}) && $self->{'ws_url'} ne "") {
-            die "ws-server not found in config";
-        }
-    }
-    # awe url
-    unless (defined $self->{'awe_url'} && $self->{'awe_url'} ne '') {
-        $self->{'awe_url'} = $cfg->{'awe-server'};
-        unless (defined($self->{'awe_url'}) && $self->{'awe_url'} ne "") {
-            die "awe-server not found in config";
-        }
-    }
-    # shock url
-    unless (defined $self->{'shock_url'} && $self->{'shock_url'} ne '') {
-        $self->{'shock_url'} = $cfg->{'shock-server'};
-        unless (defined(defined $self->{'shock_url'}) && $self->{'shock_url'} ne "") {
-            die "shock-server not found in config";
-        }
-    }
-    # client group
-    unless (defined $self->{'client_group'} && $self->{'client_group'} ne '') {
-        $self->{'client_group'} = $cfg->{'clientgroup'};
-        unless (defined($self->{'client_group'}) && $self->{'client_group'} ne "") {
-            die "clientgroup not found in config";
+    # get values
+    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'ws_wrapper', 'api_wrapper')) {
+        unless (defined $self->{$val} && $self->{$val} ne '') {
+            $self->{$val} = $cfg->{$val};
+            unless (defined($self->{$val}) && $self->{$val} ne "") {
+                die "$val not found in config";
+            }
         }
     }
 }

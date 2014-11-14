@@ -15,6 +15,7 @@ module NarrativeJobService {
     typedef structure {
         string service_name;
         string script_name;
+        boolean has_files;
     } script_method;
     
     /*

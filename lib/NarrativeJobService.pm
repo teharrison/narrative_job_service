@@ -116,3 +116,58 @@ sub delete_app {
     return {};
 }
 
+sub info_template {
+    return qq(
+    "info": {
+        "pipeline": "narrative_job_service",
+        "name": [% app_name %],
+        "user": [% user_id %],
+        "clientgroups": "[% client_group %]",
+        "userattr": {
+            "type": "kbase_app",
+            "app": [% app_name %],
+            "user": [% user_id %]
+        }
+    });
+}
+
+sub task_template {
+    return qq(
+    {
+        "cmd": {
+            "name": "[% cmd_name %]",
+            "args": "[% arg_list %]",
+            "description": "[% kb_service %].[% kb_method %]",
+            "environ": {
+                "private": {
+                    "KB_AUTH_TOKEN": "[% user_token %]"
+                }
+            }
+        },
+        "dependsOn": [[% dependent_tasks %]],
+        [% inputs %]
+        "outputs": {
+            "awe_stdout.txt": {
+                "host": "[% shock_url %]",
+                "node": "-",
+                "attrfile": "userattr.json"
+            },
+            "awe_stderr.txt": {
+                "host": "[% shock_url %]",
+                "node": "-",
+                "attrfile": "userattr.json"
+            }
+        },
+        "userattr": {
+            "step": "[% step_id %]",
+            "service": "[% kb_service %]",
+            "method": "[% kb_method %]",
+            "method_type": "[% kb_type %]",
+            "data_type": "shell output",
+            "format": "text"
+        },
+        "taskid": "[% this_task %]",
+        "totalwork": 1
+    });
+}
+

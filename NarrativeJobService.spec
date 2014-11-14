@@ -74,6 +74,9 @@ module NarrativeJobService {
     
     funcdef suspend_app(string job_id) returns (app_state) authentication required;
     
-    funcdef delete_app(string job_id) returns (app_state) authentication required;
+    /*
+        status - 'success' or 'failure' of delete action
+    */
+    funcdef delete_app(string job_id) returns (string status) authentication required;
     
 };

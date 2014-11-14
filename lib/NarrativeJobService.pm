@@ -118,22 +118,22 @@ sub readConfig {
 
 sub run_app {
     my ($self, $app, $user_name) = @_;
-    return {};
+    return ({}, undef);
 }
 
 sub check_app_state {
     my ($self, $job_id) = @_;
-    return {};
+    return ({}, undef);
 }
 
 sub suspend_app {
     my ($self, $job_id) = @_;
-    return {};
+    return ({}, undef);
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
-    return {};
+    return ({}, undef);
 }
 
 sub _info_template {

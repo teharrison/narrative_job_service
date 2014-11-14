@@ -15,4 +15,3 @@ fi
 PID=`cat $PID_FILE`
 echo "terminating process ID $PID"
 kill -TERM $PID
-rm $PID_FILE

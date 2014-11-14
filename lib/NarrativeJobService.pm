@@ -136,6 +136,30 @@ sub delete_app {
     return ({}, undef);
 }
 
+# returns: ($job_doc, $err_msg)
+sub _get_job_doc {
+    my ($self, $job_id) = @_;
+    
+    my $response = undef;
+    my $url  = $self->awe_url.'/job/'.$job_id;
+    my @args = ('Authorization', 'OAuth '.$self->user_token);
+    eval {
+        my $get = $self->agent->get($url, @args);
+        $response = $self->json->decode( $get->content );
+    };
+    if ($@ || (! ref($response))) {
+        return ({}, $@ || "Unable to connect to AWE server");
+    } elsif (exists($response->{error}) && $response->{error}) {
+        my $err = $response->{error}[0];
+        if ($err eq "Not Found") {
+            $err = "Job $job_id does not exist";
+        }
+        return ({}, $err);
+    } else {
+        return ($response->{data}, undef);
+    }
+}
+
 sub _info_template {
     return qq(
     "info": {

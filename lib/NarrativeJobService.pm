@@ -4,6 +4,8 @@ use strict;
 use warnings;
 
 use JSON;
+use Template;
+use LWP::UserAgent;
 use Config::Simple;
 use Data::Dumper;
 
@@ -12,7 +14,16 @@ use Data::Dumper;
 # set object variables from ENV
 sub new {
 	my ($class, %h) = @_;
+
+	my $agent = LWP::UserAgent->new;
+	my $json  = JSON->new;
+    $json = $json->utf8();
+    $json->max_size(0);
+    $json->allow_nonref;
+
 	my $self = {
+	    agent         => $agent,
+	    json          => $json,
 	    ws_url        => $ENV{'WS_SERVER_URL'},
 		awe_url       => $ENV{'AWE_SERVER_URL'},
 		shock_url	  => $ENV{'SHOCK_SERVER_URL'},
@@ -22,11 +33,20 @@ sub new {
 		user_token	  => undef,
 		service_token => undef
 	};
+
 	bless $self, $class;
 	$self->readConfig();
 	return $self;
 }
 
+sub agent {
+    my ($self) = @_;
+    return $self->{'agent'};
+}
+sub json {
+    my ($self) = @_;
+    return $self->{'json'};
+}
 sub ws_url {
     my ($self) = @_;
     return $self->{'ws_url'};
@@ -116,7 +136,7 @@ sub delete_app {
     return {};
 }
 
-sub info_template {
+sub _info_template {
     return qq(
     "info": {
         "pipeline": "narrative_job_service",
@@ -131,7 +151,7 @@ sub info_template {
     });
 }
 
-sub task_template {
+sub _task_template {
     return qq(
     {
         "cmd": {

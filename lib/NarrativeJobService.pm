@@ -101,6 +101,11 @@ sub readConfig {
 #    mapping<string, string> step_errors;
 #}
 
+sub version {
+    my ($self) = @_;
+    return $VERSION;
+}
+
 sub run_app {
     my ($self, $app, $user_name) = @_;
     return {};

@@ -74,5 +74,6 @@ module NarrativeJobService {
     funcdef suspend_app(string job_id) returns (app_state) authentication required;
     
     funcdef delete_app(string job_id) returns (app_state) authentication required;
-
+    
+    funcdef version() returns (string);
 };

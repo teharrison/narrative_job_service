@@ -4,30 +4,49 @@ use strict;
 use warnings;
 
 use JSON;
+use Template;
+use LWP::UserAgent;
 use Config::Simple;
 use Data::Dumper;
 
 1;
-our $VERSION = '1.0.0';
 
 # set object variables from ENV
 sub new {
 	my ($class, %h) = @_;
-	if (defined($h{'shocktoken'}) && $h{'shocktoken'} eq '') {
-		$h{'shocktoken'} = undef;
-	}
+
+	my $agent = LWP::UserAgent->new;
+	my $json  = JSON->new;
+    $json = $json->utf8();
+    $json->max_size(0);
+    $json->allow_nonref;
+
 	my $self = {
-	    ws_url       => $ENV{'WS_SERVER_URL'},
-		awe_url      => $ENV{'AWE_SERVER_URL'},
-		shock_url	 => $ENV{'SHOCK_SERVER_URL'},
-		client_group => $ENV{'AWE_CLIENT_GROUP'},
-		token	     => $h{'shocktoken'}
+	    agent         => $agent,
+	    json          => $json,
+	    ws_url        => $ENV{'WS_SERVER_URL'},
+		awe_url       => $ENV{'AWE_SERVER_URL'},
+		shock_url	  => $ENV{'SHOCK_SERVER_URL'},
+		client_group  => $ENV{'AWE_CLIENT_GROUP'},
+		ws_wrapper    => undef,
+		api_wrapper   => undef,
+		user_token	  => undef,
+		service_token => undef
 	};
+
 	bless $self, $class;
 	$self->readConfig();
 	return $self;
 }
 
+sub agent {
+    my ($self) = @_;
+    return $self->{'agent'};
+}
+sub json {
+    my ($self) = @_;
+    return $self->{'json'};
+}
 sub ws_url {
     my ($self) = @_;
     return $self->{'ws_url'};
@@ -44,12 +63,27 @@ sub client_group {
     my ($self) = @_;
     return $self->{'client_group'};
 }
-sub token {
+sub ws_wrapper {
+    my ($self) = @_;
+    return $self->{'ws_wrapper'};
+}
+sub api_wrapper {
+    my ($self) = @_;
+    return $self->{'api_wrapper'};
+}
+sub user_token {
     my ($self, $value) = @_;
     if (defined $value) {
-        $self->{'token'} = $value;
+        $self->{'user_token'} = $value;
     }
-    return $self->{'token'};
+    return $self->{'user_token'};
+}
+sub service_token {
+    my ($self, $value) = @_;
+    if (defined $value) {
+        $self->{'service_token'} = $value;
+    }
+    return $self->{'service_token'};
 }
 
 # replace object variables from config if don't exit
@@ -61,38 +95,19 @@ sub readConfig {
         die "error: deployment.cfg not found ($conf_file)";
     }
     my $cfg_full = Config::Simple->new($conf_file);
-    my $cfg = $cfg_full->param(-block=>'NarrativeJobService');
-    # workspace url
-    unless (defined $self->{'ws_url'} && $self->{'ws_url'} ne '') {
-        $self->{'ws_url'} = $cfg->{'ws-server'};
-        unless (defined($self->{'ws_url'}) && $self->{'ws_url'} ne "") {
-            die "ws-server not found in config";
-        }
-    }
-    # awe url
-    unless (defined $self->{'awe_url'} && $self->{'awe_url'} ne '') {
-        $self->{'awe_url'} = $cfg->{'awe-server'};
-        unless (defined($self->{'awe_url'}) && $self->{'awe_url'} ne "") {
-            die "awe-server not found in config";
-        }
-    }
-    # shock url
-    unless (defined $self->{'shock_url'} && $self->{'shock_url'} ne '') {
-        $self->{'shock_url'} = $cfg->{'shock-server'};
-        unless (defined(defined $self->{'shock_url'}) && $self->{'shock_url'} ne "") {
-            die "shock-server not found in config";
-        }
-    }
-    # client group
-    unless (defined $self->{'client_group'} && $self->{'client_group'} ne '') {
-        $self->{'client_group'} = $cfg->{'clientgroup'};
-        unless (defined($self->{'client_group'}) && $self->{'client_group'} ne "") {
-            die "clientgroup not found in config";
+    my $cfg = $cfg_full->param(-block=>'narrative_job_service');
+    # get values
+    foreach my $val (('ws_url','awe_url','shock_url','client_group','ws_wrapper','api_wrapper','service_token')) {
+        unless (defined $self->{$val} && $self->{$val} ne '') {
+            $self->{$val} = $cfg->{$val};
+            unless (defined($self->{$val}) && $self->{$val} ne "") {
+                die "$val not found in config";
+            }
         }
     }
 }
 
-### output ob below functions:
+### output of below functions:
 #{
 #    string job_id;
 #    string job_state;
@@ -121,4 +136,58 @@ sub delete_app {
     return {};
 }
 
+sub _info_template {
+    return qq(
+    "info": {
+        "pipeline": "narrative_job_service",
+        "name": [% app_name %],
+        "user": [% user_id %],
+        "clientgroups": "[% client_group %]",
+        "userattr": {
+            "type": "kbase_app",
+            "app": [% app_name %],
+            "user": [% user_id %]
+        }
+    });
+}
+
+sub _task_template {
+    return qq(
+    {
+        "cmd": {
+            "name": "[% cmd_name %]",
+            "args": "[% arg_list %]",
+            "description": "[% kb_service %].[% kb_method %]",
+            "environ": {
+                "private": {
+                    "KB_AUTH_TOKEN": "[% user_token %]"
+                }
+            }
+        },
+        "dependsOn": [[% dependent_tasks %]],
+        [% inputs %]
+        "outputs": {
+            "awe_stdout.txt": {
+                "host": "[% shock_url %]",
+                "node": "-",
+                "attrfile": "userattr.json"
+            },
+            "awe_stderr.txt": {
+                "host": "[% shock_url %]",
+                "node": "-",
+                "attrfile": "userattr.json"
+            }
+        },
+        "userattr": {
+            "step": "[% step_id %]",
+            "service": "[% kb_service %]",
+            "method": "[% kb_method %]",
+            "method_type": "[% kb_type %]",
+            "data_type": "shell output",
+            "format": "text"
+        },
+        "taskid": "[% this_task %]",
+        "totalwork": 1
+    });
+}
 

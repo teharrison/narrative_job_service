@@ -10,19 +10,21 @@ use NarrativeJobService;
 #END_CONSTRUCTOR
 
 #BEGIN run_app
-    $return = $self->{'instance'}->run_app($app, $user_name);
+    $self->{'instance'}->user_token($ctx->{'token'});
+    $return = $self->{'instance'}->run_app($app, $ctx->{'user_id'});
 #END run_app
 
 #BEGIN check_app_state
+    $self->{'instance'}->user_token($ctx->{'token'});
     $return = $self->{'instance'}->check_app_state($job_id);
 #END check_app_state
 
 #BEGIN suspend_app
+    $self->{'instance'}->user_token($ctx->{'token'});
     $return = $self->{'instance'}->suspend_app($job_id);
 #END suspend_app
 
 #BEGIN delete_app
+    $self->{'instance'}->user_token($ctx->{'token'});
     $return = $self->{'instance'}->delete_app($job_id);
 #END delete_app
-
-

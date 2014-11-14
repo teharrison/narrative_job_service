@@ -23,21 +23,23 @@ WRAP_PERL_SCRIPT = bash $(TOOLS_DIR)/$(WRAP_PERL_TOOL).sh
 SRC_PERL = $(wildcard plbin/*.pl)
 
 ##########################################
-# default targets
+# main targets
 
 default:
 	echo "no default make target"
 
 deploy: deploy-all
 
-deploy-all: | build-libs deploy-libs deploy-scripts deploy-cfg
-
-##########################################
-# main targets
+deploy-all: | build-libs deploy-libs build-service deploy-scripts deploy-cfg
 
 deploy-client: | build-libs deploy-libs deploy-scripts
 
-deploy-service: | build-libs deploy-libs deploy-cfg
+deploy-service: | build-libs deploy-libs build-service deploy-cfg
+
+##########################################
+# helper targets
+
+build-service:
 	mkdir -p $(TARGET)/services/$(SERVICE_DIR)
 	$(TPAGE) $(TPAGE_ARGS) service/start_service.tt > $(TARGET)/services/$(SERVICE_DIR)/start_service
 	chmod +x $(TARGET)/services/$(SERVICE_DIR)/start_service

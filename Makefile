@@ -25,23 +25,18 @@ SRC_PERL = $(wildcard plbin/*.pl)
 ##########################################
 # default targets
 
-.PHONY : default
 default:
 	echo "no default make target"
 
-.PHONY : deploy
 deploy: deploy-all
 
-.PHONY : deploy-all
-deploy-all: deploy-client deploy-service
+deploy-all: | build-libs deploy-libs deploy-scripts deploy-cfg
 
 ##########################################
 # main targets
 
-.PHONY : deploy-client
-deploy-client: deploy-libs deploy-scripts
+deploy-client: | build-libs deploy-libs deploy-scripts
 
-.PHONY : deploy-service
 deploy-service: | build-libs deploy-libs deploy-cfg
 	mkdir -p $(TARGET)/services/$(SERVICE_DIR)
 	$(TPAGE) $(TPAGE_ARGS) service/start_service.tt > $(TARGET)/services/$(SERVICE_DIR)/start_service
@@ -52,7 +47,6 @@ deploy-service: | build-libs deploy-libs deploy-cfg
 	chmod +x service/$(SERVICE_NAME).conf
 	echo "done executing deploy-service target"
 
-.PHONY : build-libs
 build-libs:
 	mkdir -p lib/Bio/KBase/${SERVICE_NAME}/
 	cp impl_code.txt lib/Bio/KBase/${SERVICE_NAME}/${SERVICE_NAME}Impl.pm
@@ -69,10 +63,8 @@ build-libs:
 ##########################################
 # test targets # requires /kb/deployment/user-env.sh to be sourced
 
-.PHONY : test
 test: test-client
 
-.PHONY : test-client
 test-client:
 	<some test script here>; \
 	if [ $$? -ne 0 ]; then \
@@ -80,7 +72,6 @@ test-client:
 	fi
 	@echo test-client successful
 
-.PHONY : test-service
 test-service:
 	$(KB_RUNTIME)/bin/perl test/service-test.pl ; \
 	if [ $$? -ne 0 ]; then \

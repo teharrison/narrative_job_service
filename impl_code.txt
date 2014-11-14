@@ -9,10 +9,6 @@ use NarrativeJobService;
 	$self->{'instance'} = new NarrativeJobService(@args);
 #END_CONSTRUCTOR
 
-#BEGIN version
-    $return = $self->{'instance'}->version();
-#END version
-
 #BEGIN run_app
     $return = $self->{'instance'}->run_app($app, $user_name);
 #END run_app

@@ -75,5 +75,4 @@ module NarrativeJobService {
     
     funcdef delete_app(string job_id) returns (app_state) authentication required;
     
-    funcdef version() returns (string);
 };

@@ -8,7 +8,6 @@ use Config::Simple;
 use Data::Dumper;
 
 1;
-our $version = '1.0.0';
 
 # set object variables from ENV
 sub new {
@@ -100,11 +99,6 @@ sub readConfig {
 #    mapping<string, string> step_outputs;
 #    mapping<string, string> step_errors;
 #}
-
-sub version {
-    my ($self) = @_;
-    return $version;
-}
 
 sub run_app {
     my ($self, $app, $user_name) = @_;

@@ -13,7 +13,7 @@ use Data::Dumper;
 
 # set object variables from ENV
 sub new {
-	my ($class, %h) = @_;
+	my ($class) = @_;
 
 	my $agent = LWP::UserAgent->new;
 	my $json  = JSON->new;
@@ -22,16 +22,15 @@ sub new {
     $json->allow_nonref;
 
 	my $self = {
-	    agent         => $agent,
-	    json          => $json,
-	    ws_url        => $ENV{'WS_SERVER_URL'},
-		awe_url       => $ENV{'AWE_SERVER_URL'},
-		shock_url	  => $ENV{'SHOCK_SERVER_URL'},
-		client_group  => $ENV{'AWE_CLIENT_GROUP'},
-		ws_wrapper    => undef,
-		api_wrapper   => undef,
-		user_token	  => undef,
-		service_token => undef
+	    agent     => $agent,
+	    json      => $json,
+	    token	  => undef,
+	    ws_url    => $ENV{'WS_SERVER_URL'},
+		awe_url   => $ENV{'AWE_SERVER_URL'},
+		shock_url => $ENV{'SHOCK_SERVER_URL'},
+		client_group     => $ENV{'AWE_CLIENT_GROUP'},
+		script_wrapper   => undef,
+		service_wrappers => {},
 	};
 
 	bless $self, $class;
@@ -46,6 +45,13 @@ sub agent {
 sub json {
     my ($self) = @_;
     return $self->{'json'};
+}
+sub token {
+    my ($self, $value) = @_;
+    if (defined $value) {
+        $self->{'token'} = $value;
+    }
+    return $self->{'token'};
 }
 sub ws_url {
     my ($self) = @_;
@@ -63,27 +69,13 @@ sub client_group {
     my ($self) = @_;
     return $self->{'client_group'};
 }
-sub ws_wrapper {
+sub script_wrapper {
     my ($self) = @_;
-    return $self->{'ws_wrapper'};
+    return $self->{'script_wrapper'};
 }
-sub api_wrapper {
+sub service_wrappers {
     my ($self) = @_;
-    return $self->{'api_wrapper'};
-}
-sub user_token {
-    my ($self, $value) = @_;
-    if (defined $value) {
-        $self->{'user_token'} = $value;
-    }
-    return $self->{'user_token'};
-}
-sub service_token {
-    my ($self, $value) = @_;
-    if (defined $value) {
-        $self->{'service_token'} = $value;
-    }
-    return $self->{'service_token'};
+    return $self->{'service_wrappers'};
 }
 
 # replace object variables from config if don't exit
@@ -97,7 +89,7 @@ sub readConfig {
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('ws_url','awe_url','shock_url','client_group','ws_wrapper','api_wrapper','service_token')) {
+    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
@@ -105,9 +97,15 @@ sub readConfig {
             }
         }
     }
+    # get service wrapper info
+    my @services = split(/,/, $cfg->{'supported_services'});
+    my @wrappers = split(/,/, $cfg->{'service_wrappers'});
+    for (my $i=0; $i<@services; $i++) {
+        $self->{'service_wrappers'}->{$services[$i]} = $wrappers[$i];
+    }
 }
 
-### output of below functions:
+### output of run_app, check_app_state:
 #{
 #    string job_id;
 #    string job_state;
@@ -123,30 +121,107 @@ sub run_app {
 
 sub check_app_state {
     my ($self, $job_id) = @_;
-    return ({}, undef);
+    # get job doc
+    my ($job, $err) = $self->_awe_job_action($job_id, 'get');
+    if ($err) {
+        return ({}, $err);
+    }
+    # set output
+    my $output = {
+        job_id => $job->{id},
+        job_state => $job->{state},
+        running_step_id => "",
+        step_outputs => {},
+        step_errors => {}
+    };
+    # parse each task
+    foreach my $task (@{$job->{tasks}}) {
+        my $step_id = $task->{userattr}->{step};
+        # get running
+        if (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) {
+            $output->{running_step_id} = $step_id;
+        }
+        # get stdout text
+        if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
+            my ($content, $err) = $self->_shock_node_file($task->{outputs}{'awe_stdout.txt'}{url});
+            if ($err) {
+                return ({}, $err);
+            }
+            $output->{step_outputs}{$step_id} = $content;
+        }
+        # get stderr text
+        if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
+            my ($content, $err) = $self->_shock_node_file($task->{outputs}{'awe_stderr.txt'}{url});
+            if ($err) {
+                return ({}, $err);
+            }
+            $output->{step_errors}{$step_id} = $content;
+        }
+    }
+    return ($output, undef);
 }
 
 sub suspend_app {
     my ($self, $job_id) = @_;
-    return ({}, undef);
+    my ($result, $err) = $self->_awe_job_action($job_id, 'put', 'suspend');
+    if ($err) {
+        return ("", $err);
+    } elsif ($result =~ /^job suspended/) {
+        return ("success", undef);
+    } else {
+        return ("failure", undef);
+    }
+}
+
+sub resume_app {
+    my ($self, $job_id) = @_;
+    my ($result, $err) = $self->_awe_job_action($job_id, 'put', 'resume');
+    if ($err) {
+        return ("", $err);
+    } elsif ($result =~ /^job resumed/) {
+        return ("success", undef);
+    } else {
+        return ("failure", undef);
+    }
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
-    return ({}, undef);
+    my ($result, $err) = $self->_awe_job_action($job_id, 'delete');
+    if ($err) {
+        return ("", $err);
+    } elsif ($result =~ /^job deleted/) {
+        return ("success", undef);
+    } else {
+        return ("failure", undef);
+    }
 }
 
-# returns: ($job_doc, $err_msg)
-sub _get_job_doc {
-    my ($self, $job_id) = @_;
-    
+# returns: (data, err_msg)
+sub _awe_job_action {
+    my ($self, $job_id, $action, $options) = @_;
+
     my $response = undef;
-    my $url  = $self->awe_url.'/job/'.$job_id;
-    my @args = ('Authorization', 'OAuth '.$self->user_token);
+    my $url = $self->awe_url.'/job/'.$job_id;
+    if ($options) {
+        $url .= "?".$options;
+    }
+    my @args = ('Authorization', 'OAuth '.$self->token);
+
     eval {
-        my $get = $self->agent->get($url, @args);
-        $response = $self->json->decode( $get->content );
+        my $tmp = undef;
+        if ($action eq 'delete') {
+            $tmp = $self->agent->delete($url, @args);
+        } elsif ($action eq 'put') {
+            my $req = POST($url, @args);
+            $req->method('PUT');
+            $tmp = $self->agent->request($req);
+        } elsif ($action eq 'get') {
+            $tmp = $self->agent->get($url, @args);
+        }
+        $response = $self->json->decode( $tmp->content );
     };
+
     if ($@ || (! ref($response))) {
         return ({}, $@ || "Unable to connect to AWE server");
     } elsif (exists($response->{error}) && $response->{error}) {
@@ -158,6 +233,28 @@ sub _get_job_doc {
     } else {
         return ($response->{data}, undef);
     }
+}
+
+# returns: (node_file_str, err_msg)
+sub _shock_node_file {
+    my ($self, $url) = @_;
+
+    my $response = undef;
+    eval {
+        $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
+    };
+    if ($@ || (! $response)) {
+        return ("", $@ || "Unable to connect to Shock server");
+    }
+    # if return is json encoded get error
+    eval {
+        my $json = $self->json->decode( $response->content );
+        if (exists($json->{error}) && $json->{error}) {
+            return ("", $json->{error});
+        }
+    };
+    # get content
+    return ($response->content, undef);
 }
 
 sub _info_template {

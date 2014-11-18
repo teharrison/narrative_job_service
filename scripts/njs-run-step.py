@@ -56,12 +56,15 @@ def get_cmd_args(params_array):
     for i, p in enumerate(params_array):
         # validate general
         if ("label" not in p) or ("value" not in p):
-            sys.stderr.write("[error] parameter number "+str(i)+" is not valid because it has no label or value")
+            sys.stderr.write("[error] parameter number %d is not valid because it has no label or value.\n"%(i))
+            return False, []
+        if len(p["label"].split()) > 1:
+            sys.stderr.write("[error] parameter number %d is not valid, label '%s' may not contain whitspace.\n"%(i, p["label"]))
             return False, []
         # validate ws
         if ("is_workspace_id" in p) and p["is_workspace_id"]:
             if not (("is_input" in p) and ("workspace_name" in p) and ("object_type" in p)):
-                sys.stderr.write("[error] parameter number "+str(i)+" is not valid because it is missing workspace information")
+                sys.stderr.write("[error] parameter number %d is not valid because it is missing workspace information.\n"%(i))
                 return False, []
         # short option
         if len(p["label"]) == 1:
@@ -104,7 +107,7 @@ def download_ws_objects(params_array):
             ws_cmd = ['ws-get', p["value"], "-w", p["workspace_name"]]
             ws_file = open(p["value"], 'w')
             if subprocess.call(ws_cmd, stdout=ws_file, stderr=sys.stderr) != 0:
-                sys.stderr.write("[error] can not download from workspace for parameter number "+str(i)+".\n")
+                sys.stderr.write("[error] can not download from workspace for parameter number %d.\n"%(i))
                 return False
             ws_file.close()
     return True
@@ -114,12 +117,12 @@ def upload_ws_objects(params_array):
         if ("is_workspace_id" in p) and p["is_workspace_id"] and (not p["is_input"]):
             ws_cmd = ['ws-load', p["object_type"], p["value"], p["value"], "-w", p["workspace_name"]]
             if subprocess.call(ws_cmd, stdout=sys.stdout, stderr=sys.stderr) != 0:
-                sys.stderr.write("[error] can not upload to workspace for parameter number "+str(i)+".\n")
+                sys.stderr.write("[error] can not upload to workspace for parameter number %d.\n"%(i))
                 return False
     return True
 
 def is_cmd(cmd):
-    return subprocess.call("type " + cmd, shell=True, stdout=None, stderr=None) == 0
+    return subprocess.call("type " + cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0
 
 def main(args):
     OptionParser.format_description = lambda self, formatter: self.description
@@ -135,9 +138,12 @@ def main(args):
         return 1
 
     cmd = args[0]
+    if len(cmd.split()) > 1:
+        sys.stderr.write("[error] command: '"+cmd+"' may not contain whitespace.\n")
+        return 1
     if not is_cmd(cmd):
         sys.stderr.write("[error] command: '"+cmd+"' not found.\n")
-	return 1
+        return 1
 
     if opts.token:
         os.environ['KB_AUTH_TOKEN'] = opts.token

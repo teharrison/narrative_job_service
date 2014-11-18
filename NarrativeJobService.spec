@@ -10,6 +10,7 @@ module NarrativeJobService {
     typedef structure {
         string service_name;
         string method_name;
+        string service_url;
     } service_method;
 
     typedef structure {
@@ -21,19 +22,26 @@ module NarrativeJobService {
     /*
         label - label of parameter, can be empty string for positional parameters
         value - value of parameter
-        is_input - parameter is an input (true) or output (false), for workspace_id
-        step_source - step_id that input derives from
-        is_workspace_id - parameter is a workspace id
-        is_object - parameter is text encoded JSON
+        step_source - step_id that parameter derives from
+        is_workspace_id - parameter is a workspace id (value is object name)
+        # the below are only used if is_workspace_id is true
+            is_input - parameter is an input (true) or output (false)
+            workspace_name - name of workspace
+            object_type - name of object type
     */
+
+    typedef structure {
+        string workspace_name;
+        string object_type;
+        boolean is_input;
+    } workspace_object;
     
     typedef structure {
         string label;
         string value;
-        boolean is_input;
         string step_source;
         boolean is_workspace_id;
-        boolean is_object;
+        workspace_object ws_object;
     } step_parameter;
     
     /*
@@ -71,12 +79,15 @@ module NarrativeJobService {
     funcdef run_app(app app) returns (app_state) authentication required;
 
     funcdef check_app_state(string job_id) returns (app_state) authentication required;
-    
-    funcdef suspend_app(string job_id) returns (app_state) authentication required;
-    
+
     /*
-        status - 'success' or 'failure' of delete action
+        status - 'success' or 'failure' of action
     */
+
+    funcdef suspend_app(string job_id) returns (string status) authentication required;
+
+    funcdef resume_app(string job_id) returns (string status) authentication required;
+
     funcdef delete_app(string job_id) returns (string status) authentication required;
     
 };

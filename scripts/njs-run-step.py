@@ -42,57 +42,84 @@ AUTHORS
     %s
 """
 
-def validate_and_get_cmd_args(params_array):
+#[{
+#    label,
+#    value,
+#    is_workspace_id,
+#    is_input,
+#    workspace_name,
+#    object_type
+#}]
+
+def get_cmd_args(params_array):
     params = []
-    for k, v in enumerate(params_array):
-        if "label" in v:
-            params.append(v["label"])
-        else:
-            sys.stderr.write("ERROR, parameter number " + k + " is not valid because it has no label")
+    for i, p in enumerate(params_array):
+        # validate general
+        if ("label" not in p) or ("value" not in p):
+            sys.stderr.write("[error] parameter number %d is not valid because it has no label or value.\n"%(i))
             return False, []
-        if "value" in v:
-            params.append(v["value"])
+        if len(p["label"].split()) > 1:
+            sys.stderr.write("[error] parameter number %d is not valid, label '%s' may not contain whitspace.\n"%(i, p["label"]))
+            return False, []
+        # validate ws
+        if ("is_workspace_id" in p) and p["is_workspace_id"]:
+            if not (("is_input" in p) and ("workspace_name" in p) and ("object_type" in p)):
+                sys.stderr.write("[error] parameter number %d is not valid because it is missing workspace information.\n"%(i))
+                return False, []
+        # short option
+        if len(p["label"]) == 1:
+            params.append("-"+p["label"])
+        # long option
+        elif len(p["label"]) > 1:
+            params.append("--"+p["label"])
+        # has value
+        if len(p["value"]) > 0:
+            params.append(p["value"])
     return True, params
 
 def check_for_ws_cmds(params_array):
     need_upload = False
     need_download = False
-    for i in params_array:
-        if (("is_workspace_id" in i) and (i["is_workspace_id"] == True)):
-            if (("is_input" in i) and (i["is_input"] == True)):
+    for p in params_array:
+        if ("is_workspace_id" in p) and p["is_workspace_id"]:
+            if ("is_input" in p) and p["is_input"]:
                 need_download = True
             else:
                 need_upload = True
 
-    if (need_upload == True):
-        if (not is_cmd("ws-load")):
-            sys.stderr.write("ERROR, ws-load command was not found and is necessary for uploading outputs to the workspace.\n")
-            return False
+    if need_upload and (not is_cmd("ws-load")):
+        sys.stderr.write("[error] ws-load command was not found and is necessary for uploading outputs to the workspace.\n")
+        return False
 
-    if (need_download == True):
-        if (not is_cmd("ws-get")):
-            sys.stderr.write("ERROR, ws-get command was not found and is necessary for downloading inputs from the workspace.\n")
-            return False
+    if need_download and (not is_cmd("ws-get")):
+        sys.stderr.write("[error] ws-get command was not found and is necessary for downloading inputs from the workspace.\n")
+        return False
 
-    if (not 'KB_AUTH_TOKEN' in os.environ):
-        sys.stderr.write("ERROR, 'KB_AUTH_TOKEN' must be set in your environment or via the --token option if you're uploading or downloading from the workspace.\n")
+    if 'KB_AUTH_TOKEN' not in os.environ:
+        sys.stderr.write("[error] 'KB_AUTH_TOKEN' must be set in your environment or via the --token option.\n")
         return False
 
     return True
 
 def download_ws_objects(params_array):
-    for k,v in enumerate(params_array):
-        if (("is_workspace_id" in v) and (v["is_workspace_id"] == True) and ("is_input" in v) and (v["is_input"] == True)):
-            if (subprocess.call(['ws-get', v["label"]], stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0):
-                sys.stderr.write("ERROR, cound load download input from workspace for parameter number: '" + k + "', labeled: '" + v["label"] + "'.\n")
-                return 1
+    for i, p in enumerate(params_array):
+        if ("is_workspace_id" in p) and p["is_workspace_id"] and p["is_input"]:
+            ws_cmd = ['ws-get', p["value"], "-w", p["workspace_name"]]
+            ws_file = open(p["value"], 'w')
+            if subprocess.call(ws_cmd, stdout=ws_file, stderr=sys.stderr) != 0:
+                sys.stderr.write("[error] can not download from workspace for parameter number %d.\n"%(i))
+                return False
+            ws_file.close()
+    return True
 
 def upload_ws_objects(params_array):
-    for k,v in enumerate(params_array):
-        if (("is_workspace_id" in v) and (v["is_workspace_id"] == True)):
-            if (subprocess.call(['ws-load', v["label"]], stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0):
-                sys.stderr.write("ERROR, cound load download input from workspace for parameter number: '" + k + "', labeled: '" + v["label"] + "'.\n")
-                return 1
+    for i, p in enumerate(params_array):
+        if ("is_workspace_id" in p) and p["is_workspace_id"] and (not p["is_input"]):
+            ws_cmd = ['ws-load', p["object_type"], p["value"], p["value"], "-w", p["workspace_name"]]
+            if subprocess.call(ws_cmd, stdout=sys.stdout, stderr=sys.stderr) != 0:
+                sys.stderr.write("[error] can not upload to workspace for parameter number %d.\n"%(i))
+                return False
+    return True
 
 def is_cmd(cmd):
     return subprocess.call("type " + cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0
@@ -106,38 +133,45 @@ def main(args):
 
     # get inputs
     (opts, args) = parser.parse_args()
-    if (len(args) < 1):
-        sys.stderr.write("ERROR, the command to be executed is required.\n")
+    if len(args) < 1:
+        sys.stderr.write("[error] the command to be executed is required.\n")
         return 1
 
     cmd = args[0]
-    if (not is_cmd(cmd)):
-        sys.stderr.write("ERROR, command: '" + cmd + "' not found.\n")
-	return 1
+    if len(cmd.split()) > 1:
+        sys.stderr.write("[error] command: '"+cmd+"' may not contain whitespace.\n")
+        return 1
+    if not is_cmd(cmd):
+        sys.stderr.write("[error] command: '"+cmd+"' not found.\n")
+        return 1
 
     if opts.token:
         os.environ['KB_AUTH_TOKEN'] = opts.token
 
     cmd_args = [cmd]
-    if (opts.params != None and opts.params != ''):
-        params_fh = open(opts.params, 'r')
-        params_array = json.load(params_fh)
+    if (opts.params != None) and (opts.params != ''):
+        params_array = json.load(open(opts.params, 'rU'))
         valid, add_cmd_args = get_cmd_args(params_array)
-        if (valid == True):
+        if valid:
             cmd_args.extend(add_cmd_args)
         else:
             return 1
-        if (len(params_array) > 0):
-            if (check_for_ws_cmds(params_array) == False):
+        if len(params_array) > 0:
+            if check_for_ws_cmds(params_array):
                 return 1
-            if (download_ws_objects(params_array) == False):
+            if download_ws_objects(params_array):
                 return 1
 
-    p = subprocess.Popen(cmd_args, stdout=sys.stdout, stderr=sys.stderr)
-
-    if (opts.params != None and opts.params != '' and len(params_array) > 0):
-        if (upload_ws_objects(params_array) == False):
+    p = subprocess.call(cmd_args, stdout=sys.stdout, stderr=sys.stderr)
+    if p != 0:
+        sys.stderr.write("[error] command: '%s' returned exit status %d\n"%(cmd, p))
+        return p
+        
+    if (opts.params != None) and (opts.params != '') and (len(params_array) > 0):
+        if upload_ws_objects(params_array):
             return 1
+    return 0
 
 if __name__ == "__main__":
     sys.exit( main(sys.argv) )
+

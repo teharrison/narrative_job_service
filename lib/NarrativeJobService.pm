@@ -116,6 +116,54 @@ sub readConfig {
 
 sub run_app {
     my ($self, $app, $user_name) = @_;
+
+    my $tpage = Template->new(ABSOLUTE => 1);
+    # build info
+    my $info_str  = "";
+    my $info_temp = _info_template();
+    my $info_vars = {
+        app_name     => $app->{name},
+        user_id      => $user_name,
+        client_group => $self->client_group
+    };
+    $tpage->process(\$info_temp, $info_vars, \$info_str) || return ({}, $tpage->error());
+    # start workflow
+    my $workflow = {
+        info => $self->json->decode($info_str),
+        tasks => []
+    };
+    # build tasks
+    my $tnum = 0;
+    foreach my $step (@{$app->{steps}}) {
+        # error checking of step type and service name
+        unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
+            return ({}, "[error] invalid step type '".$step->{type}."' for ".$step->{step_id});
+        }
+        my $service_info = $step->{$step->{type}};
+        if (($step->{type} eq 'service') && (! exists($self->service_wrappers->{$service_info->{service_name}}))) {
+            return ({}, "[error] unsupported service '".$service_info->{service_name}."' for ".$step->{step_id});
+        }
+        # task templating
+        my $step_str  = "";
+        my $step_temp = _info_template();
+        my $step_vars = {
+            cmd_name   => "",
+            arg_list   => "",
+            kb_service => $service_info->{service_name},
+            kb_method  => $service_info->{method_name},
+            kb_type    => $step->{type},
+            user_token => $self->token,
+            shock_url  => $self->shock_url,
+            step_id    => $step->{step_id},
+            # for now just the previous task
+            depends_on => ($tnum > 0) ? '"'.($tnum-1).'"' : "",
+            this_task  => $tnum,
+            inputs     => ""
+        };
+
+        $tnum += 1;
+    }
+
     return ({}, undef);
 }
 
@@ -128,11 +176,11 @@ sub check_app_state {
     }
     # set output
     my $output = {
-        job_id => $job->{id},
-        job_state => $job->{state},
+        job_id          => $job->{id},
+        job_state       => $job->{state},
         running_step_id => "",
-        step_outputs => {},
-        step_errors => {}
+        step_outputs    => {},
+        step_errors     => {}
     };
     # parse each task
     foreach my $task (@{$job->{tasks}}) {

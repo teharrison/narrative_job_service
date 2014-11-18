@@ -5,6 +5,7 @@ module NarrativeJobService {
     
     /*
         service_name - deployable KBase module
+        method_name - name of service command or script to invoke
     */
     
     typedef structure {
@@ -15,7 +16,7 @@ module NarrativeJobService {
 
     typedef structure {
         string service_name;
-        string script_name;
+        string method_name;
         boolean has_files;
     } script_method;
     

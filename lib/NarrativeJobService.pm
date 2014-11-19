@@ -314,6 +314,21 @@ sub delete_app {
     }
 }
 
+sub list_config {
+    my ($self) = @_;
+    my $cfg = {
+        ws_url    => $self->ws_url,
+		awe_url   => $self->awe_url,
+		shock_url => $self->shock_url,
+		client_group   => $self->client_group,
+		script_wrapper => $self->script_wrapper
+    };
+    foreach my $s (keys %{$self->service_wrappers}) {
+        $cfg->{$s} = $self->service_wrappers->{$s};
+    }
+    return $cfg;
+}
+
 # returns: (data, err_msg)
 sub _awe_job_action {
     my ($self, $job_id, $action, $options) = @_;

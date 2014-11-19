@@ -11,7 +11,9 @@ use NarrativeJobService;
 
 #BEGIN run_app
     $self->{'instance'}->token($ctx->{'token'});
+    my $err = undef;
     ($return, $err) = $self->{'instance'}->run_app($app, $ctx->{'user_id'});
+    print STDERR $err."\n";
     if ($err) {
         Bio::KBase::Exceptions::KBaseException->throw(
             error => $err,
@@ -22,7 +24,9 @@ use NarrativeJobService;
 
 #BEGIN check_app_state
     $self->{'instance'}->token($ctx->{'token'});
+    my $err = undef;
     ($return, $err) = $self->{'instance'}->check_app_state($job_id);
+    print STDERR $err."\n";
     if ($err) {
         Bio::KBase::Exceptions::KBaseException->throw(
             error => $err,
@@ -33,7 +37,9 @@ use NarrativeJobService;
 
 #BEGIN suspend_app
     $self->{'instance'}->token($ctx->{'token'});
+    my $err = undef;
     ($status, $err) = $self->{'instance'}->suspend_app($job_id);
+    print STDERR $err."\n";
     if ($err) {
         Bio::KBase::Exceptions::KBaseException->throw(
             error => $err,
@@ -44,7 +50,9 @@ use NarrativeJobService;
 
 #BEGIN resume_app
     $self->{'instance'}->token($ctx->{'token'});
+    my $err = undef;
     ($status, $err) = $self->{'instance'}->resume_app($job_id);
+    print STDERR $err."\n";
     if ($err) {
         Bio::KBase::Exceptions::KBaseException->throw(
             error => $err,
@@ -55,7 +63,9 @@ use NarrativeJobService;
 
 #BEGIN delete_app
     $self->{'instance'}->token($ctx->{'token'});
+    my $err = undef;
     ($status, $err) = $self->{'instance'}->delete_app($job_id);
+    print STDERR $err."\n";
     if ($err) {
         Bio::KBase::Exceptions::KBaseException->throw(
             error => $err,
@@ -63,3 +73,7 @@ use NarrativeJobService;
         );
     }
 #END delete_app
+
+#BEGIN list_config
+    $return = $self->{'instance'}->list_config();
+#END list_config

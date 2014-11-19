@@ -91,4 +91,5 @@ module NarrativeJobService {
 
     funcdef delete_app(string job_id) returns (string status) authentication required;
     
+    funcdef list_config() returns (mapping<string, string>) authentication optional;
 };

@@ -127,7 +127,7 @@ sub run_app {
     
     my $info_temp = _info_template();
     my $info_str  = "";
-    $tpage->process(\$info_temp, $info_vars, \$info_str) || return ({}, $tpage->error());
+    $tpage->process(\$info_temp, $info_vars, \$info_str) || return ({}, "[tpage error] ".$tpage->error());
     # start workflow
     my $workflow = {
         info => $self->json->decode($info_str),
@@ -139,7 +139,7 @@ sub run_app {
     foreach my $step (@{$app->{steps}}) {
         # check type
         unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
-            return ({}, "Invalid step type '".$step->{type}."' for ".$step->{step_id});
+            return ({}, "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id});
         }
         my $service = $step->{$step->{type}};
         
@@ -175,7 +175,7 @@ sub run_app {
         if ($step->{type} eq 'service') {
             # we have no wrapper
             unless (exists $self->service_wrappers->{$service->{service_name}}) {
-                return ({}, "Unsupported service '".$service->{service_name}."' for ".$step->{step_id});
+                return ({}, "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id});
             }
             my $fname = 'parameters.json';
             my ($arg_hash, $herr) = $self->_hashify_args($step->{parameters});
@@ -217,7 +217,7 @@ sub run_app {
         # process template / add to workflow
         my $task_temp = _info_template();
         my $task_str  = "";
-        $tpage->process(\$task_temp, $task_vars, \$task_str) || return ({}, $tpage->error());
+        $tpage->process(\$task_temp, $task_vars, \$task_str) || return ({}, "[tpage error] ".$tpage->error());
         push @{$workflow->{tasks}}, $self->json->decode($task_str),
         $tnum += 1;
     }
@@ -355,13 +355,13 @@ sub _awe_job_action {
     };
 
     if ($@ || (! ref($response))) {
-        return (undef, $@ || "Unable to connect to AWE server");
+        return (undef, $@ || "[awe error] unable to connect to AWE server");
     } elsif (exists($response->{error}) && $response->{error}) {
         my $err = $response->{error}[0];
         if ($err eq "Not Found") {
-            $err = "Job $job_id does not exist";
+            $err = "job $job_id does not exist";
         }
-        return (undef, $err);
+        return (undef, "[awe error] ".$err);
     } else {
         return ($response->{data}, undef);
     }
@@ -386,9 +386,9 @@ sub _post_awe_workflow {
     };
     
     if ($@ || (! $response)) {
-        return (undef, $@ || "Unable to connect to AWE server");
+        return (undef, $@ || "[awe error] unable to connect to AWE server");
     } elsif (exists($response->{error}) && $response->{error}) {
-        return (undef, $response->{error}[0]);
+        return (undef, "[awe error] ".$response->{error}[0]);
     } else {
         return ($response->{data}, undef);
     }
@@ -403,14 +403,14 @@ sub _get_shock_file {
         $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
     };
     if ($@ || (! $response)) {
-        return (undef, $@ || "Unable to connect to Shock server");
+        return (undef, $@ || "[shock error] unable to connect to Shock server");
     }
     
     # if return is json encoded get error
     eval {
         my $json = $self->json->decode( $response->content );
         if (exists($json->{error}) && $json->{error}) {
-            return (undef, $json->{error}[0]);
+            return (undef, "[shock error] ".$json->{error}[0]);
         }
     };
     # get content
@@ -438,9 +438,9 @@ sub _post_shock_file {
     };
     
     if ($@ || (! $response)) {
-        return (undef, $@ || "Unable to connect to Shock server");
+        return (undef, $@ || "[shock error] unable to connect to Shock server");
     } elsif (exists($response->{error}) && $response->{error}) {
-        return (undef, $response->{error}[0]);
+        return (undef, "[shock error] ".$response->{error}[0]);
     } else {
         my $input = {
             $fname => {
@@ -458,7 +458,7 @@ sub _hashify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         unless ($p->{label}) {
-            return (undef, "Parameter number ".$i." is not valid, label is missing");
+            return (undef, "[step error] parameter number ".$i." is not valid, label is missing");
         }
         $arg_hash->{$p->{label}} = $p->{value};
     }
@@ -471,7 +471,7 @@ sub _stringify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
-            return (undef, "Parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace");
+            return (undef, "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace");
         }
         # short option
         elsif (length($p->{label}) == 1) {
@@ -491,15 +491,15 @@ sub _stringify_args {
 
 sub _info_template {
     return qq(
-    "info": {
+    {
         "pipeline": "narrative_job_service",
-        "name": [% app_name %],
-        "user": [% user_id %],
+        "name": "[% app_name %]",
+        "user": "[% user_id %]",
         "clientgroups": "[% client_group %]",
         "userattr": {
             "type": "kbase_app",
-            "app": [% app_name %],
-            "user": [% user_id %]
+            "app": "[% app_name %]",
+            "user": "[% user_id %]"
         }
     });
 }

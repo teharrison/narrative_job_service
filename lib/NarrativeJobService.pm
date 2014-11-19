@@ -215,10 +215,10 @@ sub run_app {
             }
         }
         # process template / add to workflow
-        my $task_temp = _info_template();
+        my $task_temp = _task_template();
         my $task_str  = "";
         $tpage->process(\$task_temp, $task_vars, \$task_str) || return ({}, "[tpage error] ".$tpage->error());
-        push @{$workflow->{tasks}}, $self->json->decode($task_str),
+        $workflow->{tasks}->[$tnum] = $self->json->decode($task_str);
         $tnum += 1;
     }
 

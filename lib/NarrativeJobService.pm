@@ -98,8 +98,8 @@ sub readConfig {
         }
     }
     # get service wrapper info
-    my @services = split(/,/, $cfg->{'supported_services'});
-    my @wrappers = split(/,/, $cfg->{'service_wrappers'});
+    my @services = @{$cfg->{'supported_services'}};
+    my @wrappers = @{$cfg->{'service_wrappers'}};
     for (my $i=0; $i<@services; $i++) {
         $self->{'service_wrappers'}->{$services[$i]} = $wrappers[$i];
     }

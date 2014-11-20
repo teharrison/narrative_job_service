@@ -6,7 +6,7 @@ include $(TOP_DIR)/tools/Makefile.common
 
 SERVICE_SPEC = NarrativeJobService.spec      
 SERVICE_NAME = NarrativeJobService
-SERVICE_PORT = 8001
+SERVICE_PORT = 7080
 SERVICE_DIR  = narrative_job_service
 
 ifeq ($(SELF_URL),)

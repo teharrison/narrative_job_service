@@ -107,7 +107,7 @@ def check_for_ws_cmds(params_array):
         sys.stderr.write("[error] ws-get command was not found and is necessary for downloading inputs from the workspace.\n")
         return False
 
-    if (need_upload || need_download) and ('KB_AUTH_TOKEN' not in os.environ):
+    if (need_upload or need_download) and ('KB_AUTH_TOKEN' not in os.environ):
         sys.stderr.write("[error] 'KB_AUTH_TOKEN' must be set in your environment or via the --token option.\n")
         return False
 

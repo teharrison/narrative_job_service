@@ -85,7 +85,7 @@ sub readConfig {
     # get config
     my $conf_file = $ENV{'KB_TOP'}.'/deployment.cfg';
     unless (-e $conf_file) {
-        die "error: deployment.cfg not found ($conf_file)";
+        die "[config error] deployment.cfg not found ($conf_file):";
     }
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
@@ -94,7 +94,7 @@ sub readConfig {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
-                die "$val not found in config";
+                die "[config error] '$val' not found in deployment.cfg:";
             }
         }
     }
@@ -128,7 +128,7 @@ sub run_app {
     
     my $info_temp = _info_template();
     my $info_str  = "";
-    $tpage->process(\$info_temp, $info_vars, \$info_str) || return ({}, "[tpage error] ".$tpage->error());
+    $tpage->process(\$info_temp, $info_vars, \$info_str) || die "[template error] ".$tpage->error().":";
     # start workflow
     my $workflow = {
         info => $self->json->decode($info_str),
@@ -140,7 +140,7 @@ sub run_app {
     foreach my $step (@{$app->{steps}}) {
         # check type
         unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
-            return ({}, "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id});
+            die "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}.":";
         }
         my $service = $step->{$step->{type}};
         
@@ -176,17 +176,11 @@ sub run_app {
         if ($step->{type} eq 'service') {
             # we have no wrapper
             unless (exists $self->service_wrappers->{$service->{service_name}}) {
-                return ({}, "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id});
+                die "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}.":";
             }
             my $fname = 'parameters.json';
-            my ($arg_hash, $herr) = $self->_hashify_args($step->{parameters});
-            if ($herr) {
-                return ({}, $herr);
-            }
-            my ($input_hash, $perr) = $self->_post_shock_file($in_attr, $arg_hash, $fname);
-            if ($perr) {
-                return ({}, $perr);
-            }
+            my $arg_hash = $self->_hashify_args($step->{parameters});
+            my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
             $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
             $task_vars->{cmd_name} = $self->service_wrappers->{$service->{service_name}};
             $task_vars->{arg_list} = $service->{method_name}." @".$fname." ".$service->{service_url};
@@ -197,20 +191,14 @@ sub run_app {
             if ($service->{has_files}) {
                 my $fname = 'parameters.json';
                 my $arg_hash = {};
-                my ($input_hash, $perr) = $self->_post_shock_file($in_attr, $arg_hash, $fname);
-                if ($perr) {
-                    return ({}, $perr);
-                }
+                my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
                 $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
                 $task_vars->{cmd_name} = $self->script_wrapper;
                 $task_vars->{arg_list} = "--params @".$fname." ".$service->{method_name};
             }
             # run given cmd
             else {
-                my ($arg_str, $serr) = $self->_stringify_args($step->{parameters});
-                if ($serr) {
-                    return ({}, $serr);
-                }
+                my $arg_str = $self->_stringify_args($step->{parameters});
                 $task_vars->{cmd_name} = $service->{method_name};
                 $task_vars->{arg_list} = $arg_str;
             }
@@ -218,19 +206,15 @@ sub run_app {
         # process template / add to workflow
         my $task_temp = _task_template();
         my $task_str  = "";
-        $tpage->process(\$task_temp, $task_vars, \$task_str) || return ({}, "[tpage error] ".$tpage->error());
+        $tpage->process(\$task_temp, $task_vars, \$task_str) || die "[template error] ".$tpage->error().":";
         $workflow->{tasks}->[$tnum] = $self->json->decode($task_str);
         $tnum += 1;
     }
 
     # submit workflow
-    my ($job, $jerr) = $self->_post_awe_workflow($workflow);
-    if ($jerr) {
-        return ({}, $jerr);
-    }
+    my $job = $self->_post_awe_workflow($workflow);
     # return app info
-    my ($output, $oerr) = $self->check_app_state(undef, $job);
-    return ($output, $oerr);
+    return $self->check_app_state(undef, $job);
 }
 
 sub check_app_state {
@@ -238,11 +222,7 @@ sub check_app_state {
     
     # get job doc
     unless ($job && ref($job)) {
-        my ($job_doc, $err) = $self->_awe_job_action($job_id, 'get');
-        if ($err) {
-            return ({}, $err);
-        }
-        $job = $job_doc;
+        $job = $self->_awe_job_action($job_id, 'get');
     }
     # set output
     my $output = {
@@ -261,58 +241,34 @@ sub check_app_state {
         }
         # get stdout text
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
-            my ($content, $err) = $self->_shock_node_file($task->{outputs}{'awe_stdout.txt'}{url});
-            if ($err) {
-                return ({}, $err);
-            }
+            my $content = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
             $output->{step_outputs}{$step_id} = $content;
         }
         # get stderr text
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
-            my ($content, $err) = $self->_shock_node_file($task->{outputs}{'awe_stderr.txt'}{url});
-            if ($err) {
-                return ({}, $err);
-            }
+            my $content = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
             $output->{step_errors}{$step_id} = $content;
         }
     }
-    return ($output, undef);
+    return $output;
 }
 
 sub suspend_app {
     my ($self, $job_id) = @_;
-    my ($result, $err) = $self->_awe_job_action($job_id, 'put', 'suspend');
-    if ($err) {
-        return ("", $err);
-    } elsif ($result =~ /^job suspended/) {
-        return ("success", undef);
-    } else {
-        return ("failure", undef);
-    }
+    my $result = $self->_awe_job_action($job_id, 'put', 'suspend');
+    return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
-    my ($result, $err) = $self->_awe_job_action($job_id, 'put', 'resume');
-    if ($err) {
-        return ("", $err);
-    } elsif ($result =~ /^job resumed/) {
-        return ("success", undef);
-    } else {
-        return ("failure", undef);
-    }
+    my $result = $self->_awe_job_action($job_id, 'put', 'resume');
+    return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
-    my ($result, $err) = $self->_awe_job_action($job_id, 'delete');
-    if ($err) {
-        return ("", $err);
-    } elsif ($result =~ /^job deleted/) {
-        return ("success", undef);
-    } else {
-        return ("failure", undef);
-    }
+    my $result = $self->_awe_job_action($job_id, 'delete');
+    return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
 sub list_config {
@@ -330,7 +286,6 @@ sub list_config {
     return $cfg;
 }
 
-# returns: (data, err_msg)
 sub _awe_job_action {
     my ($self, $job_id, $action, $options) = @_;
 
@@ -356,19 +311,22 @@ sub _awe_job_action {
     };
 
     if ($@ || (! ref($response))) {
-        return (undef, $@ || "[awe error] unable to connect to AWE server");
+        if ((! $@) || ($@ =~ /malformed JSON string/)) {
+            die "[awe error] unable to connect to AWE server:"
+        } else {
+            die "[awe error] ".$@.":";
+        }
     } elsif (exists($response->{error}) && $response->{error}) {
         my $err = $response->{error}[0];
         if ($err eq "Not Found") {
             $err = "job $job_id does not exist";
         }
-        return (undef, "[awe error] ".$err);
+        die "[awe error] ".$err.":";
     } else {
-        return ($response->{data}, undef);
+        return $response->{data};
     }
 }
 
-# return: (job_doc, err_msg)
 sub _post_awe_workflow {
     my ($self, $workflow) = @_;
 
@@ -387,15 +345,18 @@ sub _post_awe_workflow {
     };
     
     if ($@ || (! $response)) {
-        return (undef, $@ || "[awe error] unable to connect to AWE server");
+        if ((! $@) || ($@ =~ /malformed JSON string/)) {
+            die "[awe error] unable to connect to AWE server:"
+        } else {
+            die "[awe error] ".$@.":";
+        }
     } elsif (exists($response->{error}) && $response->{error}) {
-        return (undef, "[awe error] ".$response->{error}[0]);
+        die "[awe error] ".$response->{error}[0].":";
     } else {
-        return ($response->{data}, undef);
+        return $response->{data};
     }
 }
 
-# returns: (node_file_str, err_msg)
 sub _get_shock_file {
     my ($self, $url) = @_;
     
@@ -404,21 +365,20 @@ sub _get_shock_file {
         $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
     };
     if ($@ || (! $response)) {
-        return (undef, $@ || "[shock error] unable to connect to Shock server");
+        die "[shock error] ".($@ || "unable to connect to Shock server").":";
     }
     
     # if return is json encoded get error
     eval {
         my $json = $self->json->decode( $response->content );
         if (exists($json->{error}) && $json->{error}) {
-            return (undef, "[shock error] ".$json->{error}[0]);
+            die "[shock error] ".$json->{error}[0].":";
         }
     };
     # get content
-    return ($response->content, undef);
+    return $response->content;
 }
 
-# returns: (awe_input_struct, err_msg)
 sub _post_shock_file {
     my ($self, $attr, $data, $fname) = @_;
     
@@ -439,17 +399,20 @@ sub _post_shock_file {
     };
     
     if ($@ || (! $response)) {
-        return (undef, $@ || "[shock error] unable to connect to Shock server");
+        if ((! $@) || ($@ =~ /malformed JSON string/)) {
+            die "[shock error] unable to connect to Shock server:"
+        } else {
+            die "[shock error] ".$@.":";
+        }
     } elsif (exists($response->{error}) && $response->{error}) {
-        return (undef, "[shock error] ".$response->{error}[0]);
+        die "[shock error] ".$response->{error}[0].":";
     } else {
-        my $input = {
+        return {
             $fname => {
                 host => $self->shock_url,
                 node => $response->{data}{id}
             }
         };
-        return ($input, undef);
     }
 }
 
@@ -459,11 +422,11 @@ sub _hashify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         unless ($p->{label}) {
-            return (undef, "[step error] parameter number ".$i." is not valid, label is missing");
+            die "[step error] parameter number ".$i." is not valid, label is missing:";
         }
         $arg_hash->{$p->{label}} = $p->{value};
     }
-    return ($arg_hash, undef);
+    return $arg_hash;
 }
 
 sub _stringify_args {
@@ -472,7 +435,7 @@ sub _stringify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
-            return (undef, "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace");
+            die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
         }
         # short option
         elsif (length($p->{label}) == 1) {
@@ -487,7 +450,7 @@ sub _stringify_args {
             push @arg_list, $p->{value};
         }
     }
-    return (join(" ", @arg_list), undef);
+    return join(" ", @arg_list);
 }
 
 sub _info_template {

@@ -190,8 +190,8 @@ sub run_app {
             # use wrapper
             if ($service->{has_files}) {
                 my $fname = 'parameters.json';
-                my $arg_hash = {};
-                my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
+                my $arg_min = $self->_minify_args($step->{parameters});
+                my $input_hash = $self->_post_shock_file($in_attr, $arg_min, $fname);
                 $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
                 $task_vars->{cmd_name} = $self->script_wrapper;
                 $task_vars->{arg_list} = "--params @".$fname." ".$service->{method_name};
@@ -427,6 +427,23 @@ sub _hashify_args {
         $arg_hash->{$p->{label}} = $p->{value};
     }
     return $arg_hash;
+}
+
+sub _minify_args {
+    my ($self, $params) = @_;
+    my $arg_min = [];
+    for (my $i=0; $i<@$params; $i++) {
+        my $p = $params->[$i];
+        $arg_min->[$i] = {
+            label           => $p->{label},
+            value           => $p->{value},
+            is_workspace_id => $p->{is_workspace_id},
+            is_input        => $p->{ws_object}{is_input},
+            workspace_name  => $p->{ws_object}{workspace_name},
+            object_type     => $p->{ws_object}{object_type}
+        };
+    }
+    return $arg_min;
 }
 
 sub _stringify_args {

@@ -311,7 +311,11 @@ sub _awe_job_action {
     };
 
     if ($@ || (! ref($response))) {
-        die "[awe error] ".($@ || "unable to connect to AWE server");
+        if ((! $@) || ($@ =~ /malformed JSON string/)) {
+            die "[awe error] unable to connect to AWE server"
+        } else {
+            die "[awe error] ".$@;
+        }
     } elsif (exists($response->{error}) && $response->{error}) {
         my $err = $response->{error}[0];
         if ($err eq "Not Found") {
@@ -341,7 +345,11 @@ sub _post_awe_workflow {
     };
     
     if ($@ || (! $response)) {
-        die "[awe error] ".($@ || "unable to connect to AWE server");
+        if ((! $@) || ($@ =~ /malformed JSON string/)) {
+            die "[awe error] unable to connect to AWE server"
+        } else {
+            die "[awe error] ".$@;
+        }
     } elsif (exists($response->{error}) && $response->{error}) {
         die "[awe error] ".$response->{error}[0];
     } else {
@@ -391,7 +399,11 @@ sub _post_shock_file {
     };
     
     if ($@ || (! $response)) {
-        die "[shock error] ".($@ || "unable to connect to Shock server");
+        if ((! $@) || ($@ =~ /malformed JSON string/)) {
+            die "[shock error] unable to connect to Shock server"
+        } else {
+            die "[shock error] ".$@;
+        }
     } elsif (exists($response->{error}) && $response->{error}) {
         die "[shock error] ".$response->{error}[0];
     } else {

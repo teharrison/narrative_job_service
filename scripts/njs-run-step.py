@@ -169,9 +169,9 @@ def main(args):
         else:
             return 1
         if len(params_array) > 0:
-            if check_for_ws_cmds(params_array):
+            if not check_for_ws_cmds(params_array):
                 return 1
-            if download_ws_objects(params_array):
+            if not download_ws_objects(params_array):
                 return 1
 
     p = subprocess.call(cmd_args, stdout=sys.stdout, stderr=sys.stderr)
@@ -180,7 +180,7 @@ def main(args):
         return p
         
     if (opts.params != None) and (opts.params != '') and (len(params_array) > 0):
-        if upload_ws_objects(params_array):
+        if not upload_ws_objects(params_array):
             return 1
     return 0
 

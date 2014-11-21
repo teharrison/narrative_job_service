@@ -180,7 +180,11 @@ def main(args):
     # get params: build args and check ws scripts
     params_array = []
     if opts.params and os.path.isfile(opts.params):
-        params_array = json.load(open(opts.params, 'rU'))
+        try:
+            params_array = json.load(open(opts.params, 'rU'))
+        except ValueError:
+            sys.stderr.write("[error] params file '"+opts.params+"' contains invalid JSON.\n")
+            return 1
         valid, add_cmd_args = get_cmd_args(params_array)
         if not valid:
             return 1
@@ -194,7 +198,7 @@ def main(args):
     # run cmd
     p = subprocess.call(cmd_args, stdout=sys.stdout, stderr=sys.stderr)
     if p != 0:
-        sys.stderr.write("[error] command: '%s' returned exit status %d\n"%(cmd, p))
+        sys.stderr.write("[error] command: '%s' returned exit status %d.\n"%(cmd, p))
         return p
     # upload
     if not upload_ws_objects(params_array):

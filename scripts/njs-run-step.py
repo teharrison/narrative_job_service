@@ -22,7 +22,19 @@ SYNOPSIS
 DESCRIPTION
     Takes as input the name of a command that will be executed.
     
-    Options include 1) --params, a JSON document input that defines the parameters that should be added when executing the command and 2) --token, a KBase auth token variable to be placed in the environment for command execution.  By default, if the KB_AUTH_TOKEN environment variable is aleady in the users environment then this doesn't need to be set.
+    Options include
+        1) --params, a JSON document input that defines the parameters that should be added when executing the command
+            format:
+            [{
+                "label": <string>,
+                "value": <string>,
+                "is_workspace_id": <boolean>,
+                "is_input": <boolean>,
+                "workspace_name": <string>,
+                "object_type": <string>
+            }]
+        
+        2) --token, a KBase auth token variable to be placed in the environment for command execution.  By default, if the KB_AUTH_TOKEN environment variable is aleady in the users environment then this doesn't need to be set.
 
     njs-run-step will download input files from, and upload output files to the workspace using the KBase auth token.
 """
@@ -128,8 +140,8 @@ def main(args):
     OptionParser.format_description = lambda self, formatter: self.description
     OptionParser.format_epilog = lambda self, formatter: self.epilog
     parser = OptionParser(usage='', description=prehelp%VERSION, epilog=posthelp%AUTH_LIST)
-    parser.add_option("", "--params", dest="params", default=None, help="JSON parameters document")
-    parser.add_option("", "--token", dest="token", default=None, help="KBase auth token")
+    parser.add_option("-p", "--params", dest="params", default=None, help="JSON parameters document")
+    parser.add_option("-t", "--token", dest="token", default=None, help="KBase auth token")
 
     # get inputs
     (opts, args) = parser.parse_args()

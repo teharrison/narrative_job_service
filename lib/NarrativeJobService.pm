@@ -85,7 +85,7 @@ sub readConfig {
     # get config
     my $conf_file = $ENV{'KB_TOP'}.'/deployment.cfg';
     unless (-e $conf_file) {
-        die "[config error] deployment.cfg not found ($conf_file)";
+        die "[config error] deployment.cfg not found ($conf_file):";
     }
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
@@ -94,7 +94,7 @@ sub readConfig {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
-                die "[config error] '$val' not found in deployment.cfg";
+                die "[config error] '$val' not found in deployment.cfg:";
             }
         }
     }
@@ -128,7 +128,7 @@ sub run_app {
     
     my $info_temp = _info_template();
     my $info_str  = "";
-    $tpage->process(\$info_temp, $info_vars, \$info_str) || die "[template error] ".$tpage->error();
+    $tpage->process(\$info_temp, $info_vars, \$info_str) || die "[template error] ".$tpage->error().":";
     # start workflow
     my $workflow = {
         info => $self->json->decode($info_str),
@@ -140,7 +140,7 @@ sub run_app {
     foreach my $step (@{$app->{steps}}) {
         # check type
         unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
-            die "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id};
+            die "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}.":";
         }
         my $service = $step->{$step->{type}};
         
@@ -176,7 +176,7 @@ sub run_app {
         if ($step->{type} eq 'service') {
             # we have no wrapper
             unless (exists $self->service_wrappers->{$service->{service_name}}) {
-                die "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id};
+                die "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}.":";
             }
             my $fname = 'parameters.json';
             my $arg_hash = $self->_hashify_args($step->{parameters});
@@ -206,7 +206,7 @@ sub run_app {
         # process template / add to workflow
         my $task_temp = _task_template();
         my $task_str  = "";
-        $tpage->process(\$task_temp, $task_vars, \$task_str) || die "[template error] ".$tpage->error();
+        $tpage->process(\$task_temp, $task_vars, \$task_str) || die "[template error] ".$tpage->error().":";
         $workflow->{tasks}->[$tnum] = $self->json->decode($task_str);
         $tnum += 1;
     }
@@ -312,16 +312,16 @@ sub _awe_job_action {
 
     if ($@ || (! ref($response))) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server"
+            die "[awe error] unable to connect to AWE server:"
         } else {
-            die "[awe error] ".$@;
+            die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
         my $err = $response->{error}[0];
         if ($err eq "Not Found") {
             $err = "job $job_id does not exist";
         }
-        die "[awe error] ".$err;
+        die "[awe error] ".$err.":";
     } else {
         return $response->{data};
     }
@@ -346,12 +346,12 @@ sub _post_awe_workflow {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server"
+            die "[awe error] unable to connect to AWE server:"
         } else {
-            die "[awe error] ".$@;
+            die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
-        die "[awe error] ".$response->{error}[0];
+        die "[awe error] ".$response->{error}[0].":";
     } else {
         return $response->{data};
     }
@@ -365,14 +365,14 @@ sub _get_shock_file {
         $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
     };
     if ($@ || (! $response)) {
-        die "[shock error] ".($@ || "unable to connect to Shock server");
+        die "[shock error] ".($@ || "unable to connect to Shock server").":";
     }
     
     # if return is json encoded get error
     eval {
         my $json = $self->json->decode( $response->content );
         if (exists($json->{error}) && $json->{error}) {
-            die "[shock error] ".$json->{error}[0];
+            die "[shock error] ".$json->{error}[0].":";
         }
     };
     # get content
@@ -400,12 +400,12 @@ sub _post_shock_file {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[shock error] unable to connect to Shock server"
+            die "[shock error] unable to connect to Shock server:"
         } else {
-            die "[shock error] ".$@;
+            die "[shock error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
-        die "[shock error] ".$response->{error}[0];
+        die "[shock error] ".$response->{error}[0].":";
     } else {
         return {
             $fname => {
@@ -422,7 +422,7 @@ sub _hashify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         unless ($p->{label}) {
-            die "[step error] parameter number ".$i." is not valid, label is missing";
+            die "[step error] parameter number ".$i." is not valid, label is missing:";
         }
         $arg_hash->{$p->{label}} = $p->{value};
     }
@@ -435,7 +435,7 @@ sub _stringify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
-            die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace";
+            die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
         }
         # short option
         elsif (length($p->{label}) == 1) {

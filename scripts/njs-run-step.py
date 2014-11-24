@@ -63,8 +63,6 @@ AUTHORS
 #    object_type
 #}]
 
-WS_IS_SET = False
-
 def get_cmd_args(params_array):
     params = []
     for i, p in enumerate(params_array):
@@ -115,12 +113,9 @@ def check_for_ws_cmds(params_array):
     return True
 
 def download_ws_objects(params_array):
-    global WS_IS_SET
     for i, p in enumerate(params_array):
         if ("is_workspace_id" in p) and p["is_workspace_id"] and p["is_input"]:
-            if not WS_IS_SET:
-                set_ws(p["workspace_name"])
-                WS_IS_SET = True
+            set_ws(p["workspace_name"], i)
             ws_cmd = ['ws-get', p["value"]]
             ws_file = open(p["value"], 'w')
             if subprocess.call(ws_cmd, stdout=ws_file, stderr=sys.stderr) != 0:
@@ -130,22 +125,19 @@ def download_ws_objects(params_array):
     return True
 
 def upload_ws_objects(params_array):
-    global WS_IS_SET
     for i, p in enumerate(params_array):
         if ("is_workspace_id" in p) and p["is_workspace_id"] and (not p["is_input"]):
-            if not WS_IS_SET:
-                set_ws(p["workspace_name"])
-                WS_IS_SET = True
+            set_ws(p["workspace_name"], i)
             ws_cmd = ['ws-load', p["object_type"], p["value"], p["value"]]
             if subprocess.call(ws_cmd, stdout=sys.stdout, stderr=sys.stderr) != 0:
                 sys.stderr.write("[error] can not upload to workspace for parameter number %d.\n"%(i))
                 return False
     return True
 
-def set_ws(ws_name):
+def set_ws(ws_name, num):
     ws_cmd = ['ws-workspace', ws_name]
     if subprocess.call(ws_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0:
-        sys.stderr.write("[error] can not set workspace for parameter number %d.\n"%(i))
+        sys.stderr.write("[error] can not set workspace for parameter number %d.\n"%(num))
         return False
     return True
 

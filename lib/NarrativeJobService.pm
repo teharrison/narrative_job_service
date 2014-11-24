@@ -117,6 +117,16 @@ sub readConfig {
 
 sub run_app {
     my ($self, $app, $user_name) = @_;
+    # get workflow
+    my $workflow = $self->compose_app($app, $user_name);
+    # submit workflow
+    my $job = $self->_post_awe_workflow($workflow);
+    # return app info
+    return $self->check_app_state(undef, $job);
+}
+
+sub compose_app {
+    my ($self, $app, $user_name) = @_;
 
     my $tpage = Template->new(ABSOLUTE => 1);
     # build info
@@ -211,11 +221,8 @@ sub run_app {
         $workflow->{tasks}->[$tnum] = $self->json->decode($task_str);
         $tnum += 1;
     }
-
-    # submit workflow
-    my $job = $self->_post_awe_workflow($workflow);
-    # return app info
-    return $self->check_app_state(undef, $job);
+    # return workflow string
+    return $self->json->encode($workflow);
 }
 
 sub check_app_state {
@@ -332,7 +339,7 @@ sub _post_awe_workflow {
     my ($self, $workflow) = @_;
 
     my $response = undef;
-    my $content  = { upload => [undef, "kbase_app.awf", Content => $self->json->encode($workflow)] };
+    my $content  = { upload => [undef, "kbase_app.awf", Content => $workflow] };
     my @args = (
         'Authorization', 'OAuth '.$self->token,
         'Datatoken', $self->token,

@@ -78,6 +78,8 @@ module NarrativeJobService {
     } app_state;
 
     funcdef run_app(app app) returns (app_state) authentication required;
+    
+    funcdef compose_app(app app) returns (string workflow) authentication required;
 
     funcdef check_app_state(string job_id) returns (app_state) authentication required;
 

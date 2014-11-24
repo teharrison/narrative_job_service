@@ -152,6 +152,7 @@ sub run_app {
             kb_method  => $service->{method_name},
             kb_type    => $step->{type},
             user_token => $self->token,
+            user_id    => $user_name,
             shock_url  => $self->shock_url,
             step_id    => $step->{step_id},
             # for now just the previous task
@@ -494,7 +495,8 @@ sub _task_template {
             "description": "[% kb_service %].[% kb_method %]",
             "environ": {
                 "private": {
-                    "KB_AUTH_TOKEN": "[% user_token %]"
+                    "KB_AUTH_TOKEN": "[% user_token %]",
+                    "KB_AUTH_USER_ID": "[% user_id %]"
                 }
             }
         },

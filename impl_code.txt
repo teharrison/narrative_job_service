@@ -16,7 +16,7 @@ use NarrativeJobService;
 
 #BEGIN compose_app
     $self->{'instance'}->token($ctx->{'token'});
-    $return = $self->{'instance'}->compose_app($app, $ctx->{'user_id'});
+    $workflow = $self->{'instance'}->compose_app($app, $ctx->{'user_id'});
 #END compose_app
 
 #BEGIN check_app_state

@@ -45,6 +45,8 @@ my $parameters;
     $parameters = decode_json $str;
 }
 close($fh);
+#Use first value of parameters array
+$parameters = $parameters->[0];
 #Retrieving service client or server object
 my $ws = get_ws_client($ARGV[3]);
 my $input = {};

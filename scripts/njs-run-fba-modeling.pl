@@ -36,6 +36,8 @@ my $parameters;
     $parameters = decode_json $str;
 }
 close($fh);
+#Use first value of parameters array
+$parameters = $parameters->[0];
 #Retrieving service client or server object
 my $url = $ARGV[2];
 my $fba = get_fba_client($url);

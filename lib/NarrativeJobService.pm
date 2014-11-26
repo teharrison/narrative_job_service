@@ -31,6 +31,7 @@ sub new {
 		shock_url => $ENV{'SHOCK_SERVER_URL'},
 		client_group     => $ENV{'AWE_CLIENT_GROUP'},
 		script_wrapper   => undef,
+		generic_wrapper  => undef,
 		service_wrappers => {},
 	};
 
@@ -74,6 +75,10 @@ sub script_wrapper {
     my ($self) = @_;
     return $self->{'script_wrapper'};
 }
+sub generic_wrapper {
+    my ($self) = @_;
+    return $self->{'generic_wrapper'};
+}
 sub service_wrappers {
     my ($self) = @_;
     return $self->{'service_wrappers'};
@@ -90,7 +95,7 @@ sub readConfig {
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
+    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper', 'generic_wrapper')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
@@ -185,13 +190,14 @@ sub compose_app {
         
         # service step
         if ($step->{type} eq 'service') {
-            # we have no wrapper
-            unless (exists $self->service_wrappers->{$service->{service_name}}) {
-                die "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}.":";
+            my $script_name = $self->generic_wrapper;
+            # get custom wrapper if available
+            if (exists $self->service_wrappers->{$service->{service_name}}) {
+                $script_name = $self->service_wrappers->{$service->{service_name}};
             }
             my $fname = 'parameters.json';
-            my $arg_hash = $self->_hashify_args($step->{parameters});
-            my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
+            my $arg_array  = $self->_process_args($step->{parameters});
+            my $input_hash = $self->_post_shock_file($in_attr, $arg_array, $fname);
             $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
             $task_vars->{cmd_name} = $self->service_wrappers->{$service->{service_name}};
             $task_vars->{arg_list} = $service->{method_name}." @".$fname." ".$service->{service_url};
@@ -424,17 +430,27 @@ sub _post_shock_file {
     }
 }
 
-sub _hashify_args {
+sub _process_args {
     my ($self, $params) = @_;
-    my $arg_hash = {};
+    my $arg_array = [];
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
-        unless ($p->{label}) {
-            die "[step error] parameter number ".$i." is not valid, label is missing:";
+        eval {
+            if ($p->{type} eq 'string') {
+                push @$arg_array, $p->{value};
+            } elsif ($p->{type} eq 'int') {
+                push @$arg_array, int($p->{value});
+            } elsif ($p->{type} eq 'float') {
+                push @$arg_array, ($p->{value} * 1.0);
+            } elsif ($p->{type} eq 'object') {
+                push @$arg_array, $self->json->decode($p->{value});
+            }
+        };
+        if ($@) {
+            die "[step error] parameter number ".$i." is not valid, value is not of type '".$p->{type}."':";
         }
-        $arg_hash->{$p->{label}} = $p->{value};
     }
-    return $arg_hash;
+    return $arg_array;
 }
 
 sub _minify_args {

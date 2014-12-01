@@ -249,16 +249,24 @@ sub check_app_state {
             $output->{running_step_id} = $step_id;
         }
         # get stdout text
+        my $stdout = "";
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
-            $output->{step_outputs}{$step_id} = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
+            $stdout = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
         } else {
-            $output->{step_outputs}{$step_id} = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
+            $stdout = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
+        }
+        if ($stdout) {
+            $output->{step_outputs}{$step_id} = $stdout;
         }
         # get stderr text
+        my $stderr = "";
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
-            $output->{step_errors}{$step_id} = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
+            $stderr = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
         } else {
-            $output->{step_outputs}{$step_id} = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
+            $stderr = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
+        }
+        if ($stderr) {
+            $output->{step_errors}{$step_id} = $stderr;
         }
     }
     return $output;

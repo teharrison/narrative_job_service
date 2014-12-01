@@ -230,7 +230,7 @@ sub check_app_state {
     
     # get job doc
     unless ($job && ref($job)) {
-        $job = $self->_awe_job_action($job_id, 'get');
+        $job = $self->_awe_action('job', $job_id, 'get');
     }
     # set output
     my $output = {
@@ -241,6 +241,7 @@ sub check_app_state {
         step_errors     => {}
     };
     # parse each task
+    # assume each task has 1 workunit
     foreach my $task (@{$job->{tasks}}) {
         my $step_id = $task->{userattr}->{step};
         # get running
@@ -249,13 +250,15 @@ sub check_app_state {
         }
         # get stdout text
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
-            my $content = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
-            $output->{step_outputs}{$step_id} = $content;
+            $output->{step_outputs}{$step_id} = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
+        } else {
+            $output->{step_outputs}{$step_id} = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
         }
         # get stderr text
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
-            my $content = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
-            $output->{step_errors}{$step_id} = $content;
+            $output->{step_errors}{$step_id} = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
+        } else {
+            $output->{step_outputs}{$step_id} = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
         }
     }
     return $output;
@@ -263,19 +266,19 @@ sub check_app_state {
 
 sub suspend_app {
     my ($self, $job_id) = @_;
-    my $result = $self->_awe_job_action($job_id, 'put', 'suspend');
+    my $result = $self->_awe_action('job', $job_id, 'put', 'suspend');
     return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
-    my $result = $self->_awe_job_action($job_id, 'put', 'resume');
+    my $result = $self->_awe_action('job', $job_id, 'put', 'resume');
     return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
-    my $result = $self->_awe_job_action($job_id, 'delete');
+    my $result = $self->_awe_action('job', $job_id, 'delete');
     return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
@@ -294,11 +297,11 @@ sub list_config {
     return $cfg;
 }
 
-sub _awe_job_action {
-    my ($self, $job_id, $action, $options) = @_;
+sub _awe_action {
+    my ($self, $type, $id, $action, $options) = @_;
 
     my $response = undef;
-    my $url = $self->awe_url.'/job/'.$job_id;
+    my $url = $self->awe_url.'/'.$type.'/'.$id;
     if ($options) {
         $url .= "?".$options;
     }
@@ -327,7 +330,7 @@ sub _awe_job_action {
     } elsif (exists($response->{error}) && $response->{error}) {
         my $err = $response->{error}[0];
         if ($err eq "Not Found") {
-            $err = "job $job_id does not exist";
+            $err = "$type $id does not exist";
         }
         die "[awe error] ".$err.":";
     } else {
@@ -485,6 +488,7 @@ sub _info_template {
         "name": "[% app_name %]",
         "user": "[% user_id %]",
         "clientgroups": "[% client_group %]",
+        "noretry": true,
         "userattr": {
             "type": "kbase_app",
             "app": "[% app_name %]",

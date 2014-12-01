@@ -362,7 +362,13 @@ sub _post_awe_workflow {
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
-        die "[awe error] ".$response->{error}[0].":";
+        # special exception for empty stdout / stderr
+        my $err = $response->{error}[0];
+        if ($err =~ /^log type .* not found$/) {
+            return "";
+        } else {
+            die "[awe error] ".$err.":";
+        }
     } else {
         return $response->{data};
     }

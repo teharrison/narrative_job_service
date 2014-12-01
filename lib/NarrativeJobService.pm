@@ -327,9 +327,14 @@ sub _awe_action {
         } else {
             die "[awe error] ".$@.":";
         }
-    } elsif (exists($response->{error}) && $response->{error}) {
+    } elsif (exists($response->{error}) && $response->{error}) {        
         my $err = $response->{error}[0];
-        if ($err eq "Not Found") {
+        # special exception for empty stdout / stderr
+        if ($err =~ /^log type .* not found$/) {
+            return "";
+        }
+        # make message more useful
+        elsif ($err eq "Not Found") {
             $err = "$type $id does not exist";
         }
         die "[awe error] ".$err.":";
@@ -362,13 +367,7 @@ sub _post_awe_workflow {
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
-        # special exception for empty stdout / stderr
-        my $err = $response->{error}[0];
-        if ($err =~ /^log type .* not found$/) {
-            return "";
-        } else {
-            die "[awe error] ".$err.":";
-        }
+        die "[awe error] ".$response->{error}[0].":";
     } else {
         return $response->{data};
     }

@@ -244,15 +244,16 @@ sub check_app_state {
     # assume each task has 1 workunit
     foreach my $task (@{$job->{tasks}}) {
         my $step_id = $task->{userattr}->{step};
+        my $running = (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) ? 1 : 0;
         # get running
-        if (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) {
+        if ($running) {
             $output->{running_step_id} = $step_id;
         }
         # get stdout text
         my $stdout = "";
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
             $stdout = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
-        } else {
+        } elsif ($running || ($task->{state} eq 'suspend')) {
             $stdout = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
         }
         if ($stdout) {
@@ -262,7 +263,7 @@ sub check_app_state {
         my $stderr = "";
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
             $stderr = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
-        } else {
+        } elsif ($running || ($task->{state} eq 'suspend')) {
             $stderr = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
         }
         if ($stderr) {

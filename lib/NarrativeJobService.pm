@@ -253,7 +253,7 @@ sub check_app_state {
         my $stdout = "";
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
             $stdout = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
-        } elsif ($running) {
+        } elsif ($running || ($task->{state} eq 'suspend')) {
             $stdout = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
         }
         if ($stdout) {
@@ -263,7 +263,7 @@ sub check_app_state {
         my $stderr = "";
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
             $stderr = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
-        } elsif ($running) {
+        } elsif ($running || ($task->{state} eq 'suspend')) {
             $stderr = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
         }
         if ($stderr) {

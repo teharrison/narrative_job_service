@@ -117,6 +117,16 @@ sub readConfig {
 
 sub run_app {
     my ($self, $app, $user_name) = @_;
+    # get workflow
+    my $workflow = $self->compose_app($app, $user_name);
+    # submit workflow
+    my $job = $self->_post_awe_workflow($workflow);
+    # return app info
+    return $self->check_app_state(undef, $job);
+}
+
+sub compose_app {
+    my ($self, $app, $user_name) = @_;
 
     my $tpage = Template->new(ABSOLUTE => 1);
     # build info
@@ -152,6 +162,7 @@ sub run_app {
             kb_method  => $service->{method_name},
             kb_type    => $step->{type},
             user_token => $self->token,
+            user_id    => $user_name,
             shock_url  => $self->shock_url,
             step_id    => $step->{step_id},
             # for now just the previous task
@@ -210,11 +221,8 @@ sub run_app {
         $workflow->{tasks}->[$tnum] = $self->json->decode($task_str);
         $tnum += 1;
     }
-
-    # submit workflow
-    my $job = $self->_post_awe_workflow($workflow);
-    # return app info
-    return $self->check_app_state(undef, $job);
+    # return workflow string
+    return $self->json->encode($workflow);
 }
 
 sub check_app_state {
@@ -222,7 +230,7 @@ sub check_app_state {
     
     # get job doc
     unless ($job && ref($job)) {
-        $job = $self->_awe_job_action($job_id, 'get');
+        $job = $self->_awe_action('job', $job_id, 'get');
     }
     # set output
     my $output = {
@@ -233,21 +241,33 @@ sub check_app_state {
         step_errors     => {}
     };
     # parse each task
+    # assume each task has 1 workunit
     foreach my $task (@{$job->{tasks}}) {
         my $step_id = $task->{userattr}->{step};
+        my $running = (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) ? 1 : 0;
         # get running
-        if (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) {
+        if ($running) {
             $output->{running_step_id} = $step_id;
         }
         # get stdout text
+        my $stdout = "";
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
-            my $content = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
-            $output->{step_outputs}{$step_id} = $content;
+            $stdout = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
+        } elsif ($running || ($task->{state} eq 'suspend')) {
+            $stdout = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
+        }
+        if ($stdout) {
+            $output->{step_outputs}{$step_id} = $stdout;
         }
         # get stderr text
+        my $stderr = "";
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
-            my $content = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
-            $output->{step_errors}{$step_id} = $content;
+            $stderr = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
+        } elsif ($running || ($task->{state} eq 'suspend')) {
+            $stderr = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
+        }
+        if ($stderr) {
+            $output->{step_errors}{$step_id} = $stderr;
         }
     }
     return $output;
@@ -255,19 +275,19 @@ sub check_app_state {
 
 sub suspend_app {
     my ($self, $job_id) = @_;
-    my $result = $self->_awe_job_action($job_id, 'put', 'suspend');
+    my $result = $self->_awe_action('job', $job_id, 'put', 'suspend');
     return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
-    my $result = $self->_awe_job_action($job_id, 'put', 'resume');
+    my $result = $self->_awe_action('job', $job_id, 'put', 'resume');
     return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
-    my $result = $self->_awe_job_action($job_id, 'delete');
+    my $result = $self->_awe_action('job', $job_id, 'delete');
     return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
@@ -286,11 +306,11 @@ sub list_config {
     return $cfg;
 }
 
-sub _awe_job_action {
-    my ($self, $job_id, $action, $options) = @_;
+sub _awe_action {
+    my ($self, $type, $id, $action, $options) = @_;
 
     my $response = undef;
-    my $url = $self->awe_url.'/job/'.$job_id;
+    my $url = $self->awe_url.'/'.$type.'/'.$id;
     if ($options) {
         $url .= "?".$options;
     }
@@ -316,10 +336,15 @@ sub _awe_job_action {
         } else {
             die "[awe error] ".$@.":";
         }
-    } elsif (exists($response->{error}) && $response->{error}) {
+    } elsif (exists($response->{error}) && $response->{error}) {        
         my $err = $response->{error}[0];
-        if ($err eq "Not Found") {
-            $err = "job $job_id does not exist";
+        # special exception for empty stdout / stderr
+        if ($err =~ /^log type .* not found$/) {
+            return "";
+        }
+        # make message more useful
+        elsif ($err eq "Not Found") {
+            $err = "$type $id does not exist";
         }
         die "[awe error] ".$err.":";
     } else {
@@ -331,7 +356,7 @@ sub _post_awe_workflow {
     my ($self, $workflow) = @_;
 
     my $response = undef;
-    my $content  = { upload => [undef, "kbase_app.awf", Content => $self->json->encode($workflow)] };
+    my $content  = { upload => [undef, "kbase_app.awf", Content => $workflow] };
     my @args = (
         'Authorization', 'OAuth '.$self->token,
         'Datatoken', $self->token,
@@ -477,6 +502,7 @@ sub _info_template {
         "name": "[% app_name %]",
         "user": "[% user_id %]",
         "clientgroups": "[% client_group %]",
+        "noretry": true,
         "userattr": {
             "type": "kbase_app",
             "app": "[% app_name %]",
@@ -494,7 +520,8 @@ sub _task_template {
             "description": "[% kb_service %].[% kb_method %]",
             "environ": {
                 "private": {
-                    "KB_AUTH_TOKEN": "[% user_token %]"
+                    "KB_AUTH_TOKEN": "[% user_token %]",
+                    "KB_AUTH_USER_ID": "[% user_id %]"
                 }
             }
         },

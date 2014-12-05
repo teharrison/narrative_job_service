@@ -14,6 +14,11 @@ use NarrativeJobService;
     $return = $self->{'instance'}->run_app($app, $ctx->{'user_id'});
 #END run_app
 
+#BEGIN compose_app
+    $self->{'instance'}->token($ctx->{'token'});
+    $workflow = $self->{'instance'}->compose_app($app, $ctx->{'user_id'});
+#END compose_app
+
 #BEGIN check_app_state
     $self->{'instance'}->token($ctx->{'token'});
     $return = $self->{'instance'}->check_app_state($job_id);

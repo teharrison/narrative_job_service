@@ -9,6 +9,7 @@ use LWP::UserAgent;
 use HTTP::Request::Common;
 use Config::Simple;
 use Data::Dumper;
+use POSIX qw(strftime);
 
 1;
 
@@ -126,12 +127,14 @@ sub run_app {
     my $workflow = $self->compose_app($app, $user_name);
     # submit workflow
     my $job = $self->_post_awe_workflow($workflow);
+    # event log
+    $self->_log_msg("run_app", "job ".$job->{id}." created for app ".$app->{name});
     # get app info
     my $output = $self->check_app_state(undef, $job);
     # log it
     my $job_dir = $self->log_dir."/".$output->{job_id};
     unless (-d $job_dir) {
-        mkdir(job_dir);
+        mkdir($job_dir);
     }
     open(APPF, ">$job_dir/app.json");
     print APPF $self->json->encode($app);
@@ -145,6 +148,9 @@ sub run_app {
 
 sub compose_app {
     my ($self, $app, $user_name) = @_;
+
+    # event log
+    $self->_log_msg("compose_app", "app ".$app->{name}." submitted by ".$user_name);
 
     my $tpage = Template->new(ABSOLUTE => 1);
     # build info
@@ -246,6 +252,9 @@ sub compose_app {
 sub check_app_state {
     my ($self, $job_id, $job) = @_;
     
+    # event log
+    $self->_log_msg("check_app_state", "job ".$job_id." queried, state = ".$job->{state});
+    
     # get job doc
     unless ($job && ref($job)) {
         $job = $self->_awe_action('job', $job_id, 'get');
@@ -292,7 +301,7 @@ sub check_app_state {
     if ($output->{job_state} eq 'completed') {
         my $job_dir = $self->log_dir."/".$output->{job_id};
         unless (-d $job_dir) {
-            mkdir(job_dir);
+            mkdir($job_dir);
         }
         open(JOBF, ">$job_dir/job.json");
         print JOBF $self->json->encode($job);
@@ -303,24 +312,28 @@ sub check_app_state {
 
 sub suspend_app {
     my ($self, $job_id) = @_;
+    $self->_log_msg("suspend_app", "job ".$job_id." suspended");
     my $result = $self->_awe_action('job', $job_id, 'put', 'suspend');
     return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
+    $self->_log_msg("resume_app", "job ".$job_id." resumed");
     my $result = $self->_awe_action('job', $job_id, 'put', 'resume');
     return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
+    $self->_log_msg("delete_app", "job ".$job_id." deleted");
     my $result = $self->_awe_action('job', $job_id, 'delete');
     return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
 sub list_config {
     my ($self) = @_;
+    $self->_log_msg("list_config", "anonymous");
     my $cfg = {
         ws_url    => $self->ws_url,
 		awe_url   => $self->awe_url,
@@ -332,6 +345,11 @@ sub list_config {
         $cfg->{$s} = $self->service_wrappers->{$s};
     }
     return $cfg;
+}
+
+sub _log_msg {
+    my ($self, $action, $msg) = @_;
+    print STDOUT strftime("%Y-%m-%dT%H:%M:%S", localtime)."\t".$action."\t".$msg."\n";
 }
 
 sub _awe_action {

@@ -96,13 +96,17 @@ sub readConfig {
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('log_dir', 'ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
+    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
                 die "[config error] '$val' not found in deployment.cfg:";
             }
         }
+    }
+    # set log dir
+    if ($cfg->{'log_dir'}) {
+        $self->{'log_dir'} = $cfg->{'log_dir'};
     }
     # get service wrapper info
     my @services = @{$cfg->{'supported_services'}};

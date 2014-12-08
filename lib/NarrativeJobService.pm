@@ -108,7 +108,7 @@ sub readConfig {
     if ($cfg->{'log_dir'}) {
         $self->{'log_dir'} = $cfg->{'log_dir'};
         unless (-d $self->{'log_dir'}."/log") {
-            mkdir(self->{'log_dir'}."/log");
+            mkdir($self->{'log_dir'}."/log");
         }
     }
     # get service wrapper info

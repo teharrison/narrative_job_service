@@ -107,6 +107,9 @@ sub readConfig {
     # set log dir
     if ($cfg->{'log_dir'}) {
         $self->{'log_dir'} = $cfg->{'log_dir'};
+        unless (-d $self->{'log_dir'}."/log") {
+            mkdir(self->{'log_dir'}."/log");
+        }
     }
     # get service wrapper info
     my @services = @{$cfg->{'supported_services'}};
@@ -132,11 +135,11 @@ sub run_app {
     # submit workflow
     my $job = $self->_post_awe_workflow($workflow);
     # event log
-    $self->_log_msg("run_app", "job ".$job->{id}." created for app ".$app->{name});
+    $self->_log_event("run_app", "job ".$job->{id}." created for app ".$app->{name});
     # get app info
     my $output = $self->check_app_state(undef, $job);
     # log it
-    my $job_dir = $self->log_dir."/".$output->{job_id};
+    my $job_dir = $self->log_dir."/log/".$output->{job_id};
     unless (-d $job_dir) {
         mkdir($job_dir);
     }
@@ -154,7 +157,7 @@ sub compose_app {
     my ($self, $app, $user_name) = @_;
 
     # event log
-    $self->_log_msg("compose_app", "app ".$app->{name}." submitted by ".$user_name);
+    $self->_log_event("compose_app", "app ".$app->{name}." submitted by ".$user_name);
 
     my $tpage = Template->new(ABSOLUTE => 1);
     # build info
@@ -260,7 +263,7 @@ sub check_app_state {
         $job = $self->_awe_action('job', $job_id, 'get');
     }
     # event log
-    $self->_log_msg("check_app_state", "job ".$job_id." queried, state = ".$job->{state});
+    $self->_log_event("check_app_state", "job ".$job->{id}." queried, state = ".$job->{state});
     # set output
     my $output = {
         job_id          => $job->{id},
@@ -301,7 +304,7 @@ sub check_app_state {
     }
     # log it if completed
     if ($output->{job_state} eq 'completed') {
-        my $job_dir = $self->log_dir."/".$output->{job_id};
+        my $job_dir = $self->log_dir."/log/".$output->{job_id};
         unless (-d $job_dir) {
             mkdir($job_dir);
         }
@@ -314,28 +317,28 @@ sub check_app_state {
 
 sub suspend_app {
     my ($self, $job_id) = @_;
-    $self->_log_msg("suspend_app", "job ".$job_id." suspended");
+    $self->_log_event("suspend_app", "job ".$job_id." suspended");
     my $result = $self->_awe_action('job', $job_id, 'put', 'suspend');
     return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
-    $self->_log_msg("resume_app", "job ".$job_id." resumed");
+    $self->_log_event("resume_app", "job ".$job_id." resumed");
     my $result = $self->_awe_action('job', $job_id, 'put', 'resume');
     return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
-    $self->_log_msg("delete_app", "job ".$job_id." deleted");
+    $self->_log_event("delete_app", "job ".$job_id." deleted");
     my $result = $self->_awe_action('job', $job_id, 'delete');
     return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
 sub list_config {
     my ($self) = @_;
-    $self->_log_msg("list_config", "anonymous");
+    $self->_log_event("list_config", "anonymous");
     my $cfg = {
         log_dir   => $self->log_dir,
         ws_url    => $self->ws_url,
@@ -350,9 +353,12 @@ sub list_config {
     return $cfg;
 }
 
-sub _log_msg {
+sub _log_event {
     my ($self, $action, $msg) = @_;
-    print STDOUT strftime("%Y-%m-%dT%H:%M:%S", localtime)."\t".$action."\t".$msg."\n";
+    my $events = $self->log_dir."event.log";
+    open(LOGF, ">>$events");
+    print LOGF strftime("%Y-%m-%dT%H:%M:%S", localtime)."\t".$action."\t".$msg."\n";
+    close(LOGF);
 }
 
 sub _awe_action {

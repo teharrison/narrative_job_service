@@ -91,6 +91,7 @@ sub readConfig {
     # get config
     my $conf_file = $ENV{'KB_TOP'}.'/deployment.cfg';
     unless (-e $conf_file) {
+        print STDERR "[config error] deployment.cfg not found ($conf_file)\n";
         die "[config error] deployment.cfg not found ($conf_file):";
     }
     my $cfg_full = Config::Simple->new($conf_file);
@@ -100,6 +101,7 @@ sub readConfig {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
+                print STDERR "[config error] '$val' not found in deployment.cfg\n";
                 die "[config error] '$val' not found in deployment.cfg:";
             }
         }
@@ -181,6 +183,7 @@ sub compose_app {
     foreach my $step (@{$app->{steps}}) {
         # check type
         unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
+            print STDERR "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}."\n";
             die "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}.":";
         }
         my $service = $step->{$step->{type}};
@@ -218,6 +221,7 @@ sub compose_app {
         if ($step->{type} eq 'service') {
             # we have no wrapper
             unless (exists $self->service_wrappers->{$service->{service_name}}) {
+                print STDERR "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}."\n";
                 die "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}.":";
             }
             my $fname = 'parameters.json';
@@ -387,8 +391,10 @@ sub _awe_action {
 
     if ($@ || (! ref($response))) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server:"
+            print STDERR "[awe error] unable to connect to AWE server\n";
+            die "[awe error] unable to connect to AWE server:";
         } else {
+            print STDERR "[awe error] ".$@."\n";
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {        
@@ -401,6 +407,7 @@ sub _awe_action {
         elsif ($err eq "Not Found") {
             $err = "$type $id does not exist";
         }
+        print STDERR "[awe error] ".$err."\n";
         die "[awe error] ".$err.":";
     } else {
         return $response->{data};
@@ -426,11 +433,14 @@ sub _post_awe_workflow {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server:"
+            print STDERR "[awe error] unable to connect to AWE server\n";
+            die "[awe error] unable to connect to AWE server:";
         } else {
+            print STDERR "[awe error] ".$@."\n";
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
+        print STDERR "[awe error] ".$response->{error}[0]."\n";
         die "[awe error] ".$response->{error}[0].":";
     } else {
         return $response->{data};
@@ -445,6 +455,7 @@ sub _get_shock_file {
         $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
     };
     if ($@ || (! $response)) {
+        print STDERR "[shock error] ".($@ || "unable to connect to Shock server")."\n";
         die "[shock error] ".($@ || "unable to connect to Shock server").":";
     }
     
@@ -452,6 +463,7 @@ sub _get_shock_file {
     eval {
         my $json = $self->json->decode( $response->content );
         if (exists($json->{error}) && $json->{error}) {
+            print STDERR "[shock error] ".$json->{error}[0]."\n";
             die "[shock error] ".$json->{error}[0].":";
         }
     };
@@ -480,11 +492,14 @@ sub _post_shock_file {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[shock error] unable to connect to Shock server:"
+            print STDERR "[shock error] unable to connect to Shock server\n";
+            die "[shock error] unable to connect to Shock server:";
         } else {
+            print STDERR "[shock error] ".$@."\n";
             die "[shock error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
+        print STDERR "[shock error] ".$response->{error}[0]."\n";
         die "[shock error] ".$response->{error}[0].":";
     } else {
         return {
@@ -502,6 +517,7 @@ sub _hashify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         unless ($p->{label}) {
+            print STDERR "[step error] parameter number ".$i." is not valid, label is missing\n";
             die "[step error] parameter number ".$i." is not valid, label is missing:";
         }
         $arg_hash->{$p->{label}} = $p->{value};
@@ -532,6 +548,7 @@ sub _stringify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
+            print STDERR "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace\n";
             die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
         }
         # short option

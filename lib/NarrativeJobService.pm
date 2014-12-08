@@ -26,6 +26,7 @@ sub new {
 	    agent     => $agent,
 	    json      => $json,
 	    token	  => undef,
+	    log_dir   => ".",
 	    ws_url    => $ENV{'WS_SERVER_URL'},
 		awe_url   => $ENV{'AWE_SERVER_URL'},
 		shock_url => $ENV{'SHOCK_SERVER_URL'},
@@ -53,6 +54,10 @@ sub token {
         $self->{'token'} = $value;
     }
     return $self->{'token'};
+}
+sub log_dir {
+    my ($self) = @_;
+    return $self->{'log_dir'};
 }
 sub ws_url {
     my ($self) = @_;
@@ -90,7 +95,7 @@ sub readConfig {
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
+    foreach my $val (('log_dir', 'ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
@@ -121,8 +126,21 @@ sub run_app {
     my $workflow = $self->compose_app($app, $user_name);
     # submit workflow
     my $job = $self->_post_awe_workflow($workflow);
-    # return app info
-    return $self->check_app_state(undef, $job);
+    # get app info
+    my $output = $self->check_app_state(undef, $job);
+    # log it
+    my $job_dir = $self->log_dir."/".$output->{job_id};
+    unless (-d $job_dir) {
+        mkdir(job_dir);
+    }
+    open(APPF, ">$job_dir/app.json");
+    print APPF $self->json->encode($app);
+    close(APPF);
+    open(AWFF, ">$job_dir/workflow.json");
+    print AWFF $workflow;
+    close(AWFF);
+    # done
+    return $output;
 }
 
 sub compose_app {
@@ -269,6 +287,16 @@ sub check_app_state {
         if ($stderr) {
             $output->{step_errors}{$step_id} = $stderr;
         }
+    }
+    # log it if completed
+    if ($output->{job_state} eq 'completed') {
+        my $job_dir = $self->log_dir."/".$output->{job_id};
+        unless (-d $job_dir) {
+            mkdir(job_dir);
+        }
+        open(JOBF, ">$job_dir/job.json");
+        print JOBF $self->json->encode($job);
+        close(JOBF);
     }
     return $output;
 }

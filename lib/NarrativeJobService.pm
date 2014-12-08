@@ -9,6 +9,7 @@ use LWP::UserAgent;
 use HTTP::Request::Common;
 use Config::Simple;
 use Data::Dumper;
+use POSIX qw(strftime);
 
 1;
 
@@ -90,17 +91,26 @@ sub readConfig {
     # get config
     my $conf_file = $ENV{'KB_TOP'}.'/deployment.cfg';
     unless (-e $conf_file) {
+        print STDERR "[config error] deployment.cfg not found ($conf_file)\n";
         die "[config error] deployment.cfg not found ($conf_file):";
     }
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('log_dir', 'ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
+    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
+                print STDERR "[config error] '$val' not found in deployment.cfg\n";
                 die "[config error] '$val' not found in deployment.cfg:";
             }
+        }
+    }
+    # set log dir
+    if ($cfg->{'log_dir'}) {
+        $self->{'log_dir'} = $cfg->{'log_dir'};
+        unless (-d $self->{'log_dir'}."/log") {
+            mkdir($self->{'log_dir'}."/log");
         }
     }
     # get service wrapper info
@@ -126,12 +136,14 @@ sub run_app {
     my $workflow = $self->compose_app($app, $user_name);
     # submit workflow
     my $job = $self->_post_awe_workflow($workflow);
+    # event log
+    $self->_log_event("run_app", "job ".$job->{id}." created for app ".$app->{name});
     # get app info
     my $output = $self->check_app_state(undef, $job);
     # log it
-    my $job_dir = $self->log_dir."/".$output->{job_id};
+    my $job_dir = $self->log_dir."/log/".$output->{job_id};
     unless (-d $job_dir) {
-        mkdir(job_dir);
+        mkdir($job_dir);
     }
     open(APPF, ">$job_dir/app.json");
     print APPF $self->json->encode($app);
@@ -145,6 +157,9 @@ sub run_app {
 
 sub compose_app {
     my ($self, $app, $user_name) = @_;
+
+    # event log
+    $self->_log_event("compose_app", "app ".$app->{name}." submitted by ".$user_name);
 
     my $tpage = Template->new(ABSOLUTE => 1);
     # build info
@@ -168,6 +183,7 @@ sub compose_app {
     foreach my $step (@{$app->{steps}}) {
         # check type
         unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
+            print STDERR "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}."\n";
             die "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}.":";
         }
         my $service = $step->{$step->{type}};
@@ -205,6 +221,7 @@ sub compose_app {
         if ($step->{type} eq 'service') {
             # we have no wrapper
             unless (exists $self->service_wrappers->{$service->{service_name}}) {
+                print STDERR "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}."\n";
                 die "[service error] unsupported service '".$service->{service_name}."' for ".$step->{step_id}.":";
             }
             my $fname = 'parameters.json';
@@ -245,11 +262,12 @@ sub compose_app {
 
 sub check_app_state {
     my ($self, $job_id, $job) = @_;
-    
     # get job doc
     unless ($job && ref($job)) {
         $job = $self->_awe_action('job', $job_id, 'get');
     }
+    # event log
+    $self->_log_event("check_app_state", "job ".$job->{id}." queried, state = ".$job->{state});
     # set output
     my $output = {
         job_id          => $job->{id},
@@ -290,9 +308,9 @@ sub check_app_state {
     }
     # log it if completed
     if ($output->{job_state} eq 'completed') {
-        my $job_dir = $self->log_dir."/".$output->{job_id};
+        my $job_dir = $self->log_dir."/log/".$output->{job_id};
         unless (-d $job_dir) {
-            mkdir(job_dir);
+            mkdir($job_dir);
         }
         open(JOBF, ">$job_dir/job.json");
         print JOBF $self->json->encode($job);
@@ -303,25 +321,30 @@ sub check_app_state {
 
 sub suspend_app {
     my ($self, $job_id) = @_;
+    $self->_log_event("suspend_app", "job ".$job_id." suspended");
     my $result = $self->_awe_action('job', $job_id, 'put', 'suspend');
     return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
+    $self->_log_event("resume_app", "job ".$job_id." resumed");
     my $result = $self->_awe_action('job', $job_id, 'put', 'resume');
     return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
+    $self->_log_event("delete_app", "job ".$job_id." deleted");
     my $result = $self->_awe_action('job', $job_id, 'delete');
     return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
 sub list_config {
     my ($self) = @_;
+    $self->_log_event("list_config", "anonymous");
     my $cfg = {
+        log_dir   => $self->log_dir,
         ws_url    => $self->ws_url,
 		awe_url   => $self->awe_url,
 		shock_url => $self->shock_url,
@@ -332,6 +355,14 @@ sub list_config {
         $cfg->{$s} = $self->service_wrappers->{$s};
     }
     return $cfg;
+}
+
+sub _log_event {
+    my ($self, $action, $msg) = @_;
+    my $events = $self->log_dir."/event.log";
+    open(LOGF, ">>$events");
+    print LOGF strftime("%Y-%m-%dT%H:%M:%S", localtime)."\t".$action."\t".$msg."\n";
+    close(LOGF);
 }
 
 sub _awe_action {
@@ -360,8 +391,10 @@ sub _awe_action {
 
     if ($@ || (! ref($response))) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server:"
+            print STDERR "[awe error] unable to connect to AWE server\n";
+            die "[awe error] unable to connect to AWE server:";
         } else {
+            print STDERR "[awe error] ".$@."\n";
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {        
@@ -374,6 +407,7 @@ sub _awe_action {
         elsif ($err eq "Not Found") {
             $err = "$type $id does not exist";
         }
+        print STDERR "[awe error] ".$err."\n";
         die "[awe error] ".$err.":";
     } else {
         return $response->{data};
@@ -399,11 +433,14 @@ sub _post_awe_workflow {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server:"
+            print STDERR "[awe error] unable to connect to AWE server\n";
+            die "[awe error] unable to connect to AWE server:";
         } else {
+            print STDERR "[awe error] ".$@."\n";
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
+        print STDERR "[awe error] ".$response->{error}[0]."\n";
         die "[awe error] ".$response->{error}[0].":";
     } else {
         return $response->{data};
@@ -418,6 +455,7 @@ sub _get_shock_file {
         $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
     };
     if ($@ || (! $response)) {
+        print STDERR "[shock error] ".($@ || "unable to connect to Shock server")."\n";
         die "[shock error] ".($@ || "unable to connect to Shock server").":";
     }
     
@@ -425,6 +463,7 @@ sub _get_shock_file {
     eval {
         my $json = $self->json->decode( $response->content );
         if (exists($json->{error}) && $json->{error}) {
+            print STDERR "[shock error] ".$json->{error}[0]."\n";
             die "[shock error] ".$json->{error}[0].":";
         }
     };
@@ -453,11 +492,14 @@ sub _post_shock_file {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[shock error] unable to connect to Shock server:"
+            print STDERR "[shock error] unable to connect to Shock server\n";
+            die "[shock error] unable to connect to Shock server:";
         } else {
+            print STDERR "[shock error] ".$@."\n";
             die "[shock error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
+        print STDERR "[shock error] ".$response->{error}[0]."\n";
         die "[shock error] ".$response->{error}[0].":";
     } else {
         return {
@@ -475,6 +517,7 @@ sub _hashify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         unless ($p->{label}) {
+            print STDERR "[step error] parameter number ".$i." is not valid, label is missing\n";
             die "[step error] parameter number ".$i." is not valid, label is missing:";
         }
         $arg_hash->{$p->{label}} = $p->{value};
@@ -505,6 +548,7 @@ sub _stringify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
+            print STDERR "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace\n";
             die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
         }
         # short option

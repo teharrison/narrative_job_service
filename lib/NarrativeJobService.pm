@@ -355,7 +355,7 @@ sub list_config {
 
 sub _log_event {
     my ($self, $action, $msg) = @_;
-    my $events = $self->log_dir."event.log";
+    my $events = $self->log_dir."/event.log";
     open(LOGF, ">>$events");
     print LOGF strftime("%Y-%m-%dT%H:%M:%S", localtime)."\t".$action."\t".$msg."\n";
     close(LOGF);

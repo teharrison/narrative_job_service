@@ -333,6 +333,7 @@ sub list_config {
     my ($self) = @_;
     $self->_log_msg("list_config", "anonymous");
     my $cfg = {
+        log_dir   => $self->log_dir,
         ws_url    => $self->ws_url,
 		awe_url   => $self->awe_url,
 		shock_url => $self->shock_url,

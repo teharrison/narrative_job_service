@@ -251,14 +251,12 @@ sub compose_app {
 
 sub check_app_state {
     my ($self, $job_id, $job) = @_;
-    
-    # event log
-    $self->_log_msg("check_app_state", "job ".$job_id." queried, state = ".$job->{state});
-    
     # get job doc
     unless ($job && ref($job)) {
         $job = $self->_awe_action('job', $job_id, 'get');
     }
+    # event log
+    $self->_log_msg("check_app_state", "job ".$job_id." queried, state = ".$job->{state});
     # set output
     my $output = {
         job_id          => $job->{id},

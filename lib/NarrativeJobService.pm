@@ -597,7 +597,7 @@ sub _task_template {
                 }
             }
         },
-        "dependsOn": [[% dependent_tasks %]],
+        "dependsOn": [[% depends_on %]],
         [% inputs %]
         "outputs": {
             "awe_stdout.txt": {

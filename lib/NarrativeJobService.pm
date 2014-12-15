@@ -9,6 +9,7 @@ use LWP::UserAgent;
 use HTTP::Request::Common;
 use Config::Simple;
 use Data::Dumper;
+use POSIX qw(strftime);
 
 1;
 
@@ -26,6 +27,7 @@ sub new {
 	    agent     => $agent,
 	    json      => $json,
 	    token	  => undef,
+	    log_dir   => ".",
 	    ws_url    => $ENV{'WS_SERVER_URL'},
 		awe_url   => $ENV{'AWE_SERVER_URL'},
 		shock_url => $ENV{'SHOCK_SERVER_URL'},
@@ -54,6 +56,10 @@ sub token {
         $self->{'token'} = $value;
     }
     return $self->{'token'};
+}
+sub log_dir {
+    my ($self) = @_;
+    return $self->{'log_dir'};
 }
 sub ws_url {
     my ($self) = @_;
@@ -90,6 +96,7 @@ sub readConfig {
     # get config
     my $conf_file = $ENV{'KB_TOP'}.'/deployment.cfg';
     unless (-e $conf_file) {
+        print STDERR "[config error] deployment.cfg not found ($conf_file)\n";
         die "[config error] deployment.cfg not found ($conf_file):";
     }
     my $cfg_full = Config::Simple->new($conf_file);
@@ -99,8 +106,16 @@ sub readConfig {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
+                print STDERR "[config error] '$val' not found in deployment.cfg\n";
                 die "[config error] '$val' not found in deployment.cfg:";
             }
+        }
+    }
+    # set log dir
+    if ($cfg->{'log_dir'}) {
+        $self->{'log_dir'} = $cfg->{'log_dir'};
+        unless (-d $self->{'log_dir'}."/log") {
+            mkdir($self->{'log_dir'}."/log");
         }
     }
     # get service wrapper info
@@ -126,12 +141,30 @@ sub run_app {
     my $workflow = $self->compose_app($app, $user_name);
     # submit workflow
     my $job = $self->_post_awe_workflow($workflow);
-    # return app info
-    return $self->check_app_state(undef, $job);
+    # event log
+    $self->_log_event("run_app", "job ".$job->{id}." created for app ".$app->{name});
+    # get app info
+    my $output = $self->check_app_state(undef, $job);
+    # log it
+    my $job_dir = $self->log_dir."/log/".$output->{job_id};
+    unless (-d $job_dir) {
+        mkdir($job_dir);
+    }
+    open(APPF, ">$job_dir/app.json");
+    print APPF $self->json->encode($app);
+    close(APPF);
+    open(AWFF, ">$job_dir/workflow.json");
+    print AWFF $workflow;
+    close(AWFF);
+    # done
+    return $output;
 }
 
 sub compose_app {
     my ($self, $app, $user_name) = @_;
+
+    # event log
+    $self->_log_event("compose_app", "app ".$app->{name}." submitted by ".$user_name);
 
     my $tpage = Template->new(ABSOLUTE => 1);
     # build info
@@ -155,6 +188,7 @@ sub compose_app {
     foreach my $step (@{$app->{steps}}) {
         # check type
         unless (($step->{type} eq 'script') || ($step->{type} eq 'service')) {
+            print STDERR "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}."\n";
             die "[step error] invalid step type '".$step->{type}."' for ".$step->{step_id}.":";
         }
         my $service = $step->{$step->{type}};
@@ -233,11 +267,12 @@ sub compose_app {
 
 sub check_app_state {
     my ($self, $job_id, $job) = @_;
-    
     # get job doc
     unless ($job && ref($job)) {
         $job = $self->_awe_action('job', $job_id, 'get');
     }
+    # event log
+    $self->_log_event("check_app_state", "job ".$job->{id}." queried, state = ".$job->{state});
     # set output
     my $output = {
         job_id          => $job->{id},
@@ -250,47 +285,71 @@ sub check_app_state {
     # assume each task has 1 workunit
     foreach my $task (@{$job->{tasks}}) {
         my $step_id = $task->{userattr}->{step};
+        my $running = (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) ? 1 : 0;
         # get running
-        if (($task->{state} eq 'queued') || ($task->{state} eq 'in-progress')) {
+        if ($running) {
             $output->{running_step_id} = $step_id;
         }
         # get stdout text
+        my $stdout = "";
         if (exists($task->{outputs}{'awe_stdout.txt'}) && $task->{outputs}{'awe_stdout.txt'}{url}) {
-            $output->{step_outputs}{$step_id} = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
-        } else {
-            $output->{step_outputs}{$step_id} = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
+            $stdout = $self->_get_shock_file($task->{outputs}{'awe_stdout.txt'}{url});
+        } elsif ($running || ($task->{state} eq 'suspend')) {
+            $stdout = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stdout');
+        }
+        if ($stdout) {
+            $output->{step_outputs}{$step_id} = $stdout;
         }
         # get stderr text
+        my $stderr = "";
         if (exists($task->{outputs}{'awe_stderr.txt'}) && $task->{outputs}{'awe_stderr.txt'}{url}) {
-            $output->{step_errors}{$step_id} = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
-        } else {
-            $output->{step_outputs}{$step_id} = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
+            $stderr = $self->_get_shock_file($task->{outputs}{'awe_stderr.txt'}{url});
+        } elsif ($running || ($task->{state} eq 'suspend')) {
+            $stderr = $self->_awe_action('work', $task->{taskid}.'_0', 'get', 'report=stderr');
         }
+        if ($stderr) {
+            $output->{step_errors}{$step_id} = $stderr;
+        }
+    }
+    # log it if completed
+    if ($output->{job_state} eq 'completed') {
+        my $job_dir = $self->log_dir."/log/".$output->{job_id};
+        unless (-d $job_dir) {
+            mkdir($job_dir);
+        }
+        open(JOBF, ">$job_dir/job.json");
+        print JOBF $self->json->encode($job);
+        close(JOBF);
     }
     return $output;
 }
 
 sub suspend_app {
     my ($self, $job_id) = @_;
+    $self->_log_event("suspend_app", "job ".$job_id." suspended");
     my $result = $self->_awe_action('job', $job_id, 'put', 'suspend');
     return ($result =~ /^job suspended/) ? "success" : "failure";
 }
 
 sub resume_app {
     my ($self, $job_id) = @_;
+    $self->_log_event("resume_app", "job ".$job_id." resumed");
     my $result = $self->_awe_action('job', $job_id, 'put', 'resume');
     return ($result =~ /^job resumed/) ? "success" : "failure";
 }
 
 sub delete_app {
     my ($self, $job_id) = @_;
+    $self->_log_event("delete_app", "job ".$job_id." deleted");
     my $result = $self->_awe_action('job', $job_id, 'delete');
     return ($result =~ /^job deleted/) ? "success" : "failure";
 }
 
 sub list_config {
     my ($self) = @_;
+    $self->_log_event("list_config", "anonymous");
     my $cfg = {
+        log_dir   => $self->log_dir,
         ws_url    => $self->ws_url,
 		awe_url   => $self->awe_url,
 		shock_url => $self->shock_url,
@@ -301,6 +360,14 @@ sub list_config {
         $cfg->{$s} = $self->service_wrappers->{$s};
     }
     return $cfg;
+}
+
+sub _log_event {
+    my ($self, $action, $msg) = @_;
+    my $events = $self->log_dir."/event.log";
+    open(LOGF, ">>$events");
+    print LOGF strftime("%Y-%m-%dT%H:%M:%S", localtime)."\t".$action."\t".$msg."\n";
+    close(LOGF);
 }
 
 sub _awe_action {
@@ -329,8 +396,10 @@ sub _awe_action {
 
     if ($@ || (! ref($response))) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server:"
+            print STDERR "[awe error] unable to connect to AWE server\n";
+            die "[awe error] unable to connect to AWE server:";
         } else {
+            print STDERR "[awe error] ".$@."\n";
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {        
@@ -343,6 +412,7 @@ sub _awe_action {
         elsif ($err eq "Not Found") {
             $err = "$type $id does not exist";
         }
+        print STDERR "[awe error] ".$err."\n";
         die "[awe error] ".$err.":";
     } else {
         return $response->{data};
@@ -368,11 +438,14 @@ sub _post_awe_workflow {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[awe error] unable to connect to AWE server:"
+            print STDERR "[awe error] unable to connect to AWE server\n";
+            die "[awe error] unable to connect to AWE server:";
         } else {
+            print STDERR "[awe error] ".$@."\n";
             die "[awe error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
+        print STDERR "[awe error] ".$response->{error}[0]."\n";
         die "[awe error] ".$response->{error}[0].":";
     } else {
         return $response->{data};
@@ -387,6 +460,7 @@ sub _get_shock_file {
         $response = $self->agent->get($url, 'Authorization', 'OAuth '.$self->token);
     };
     if ($@ || (! $response)) {
+        print STDERR "[shock error] ".($@ || "unable to connect to Shock server")."\n";
         die "[shock error] ".($@ || "unable to connect to Shock server").":";
     }
     
@@ -394,6 +468,7 @@ sub _get_shock_file {
     eval {
         my $json = $self->json->decode( $response->content );
         if (exists($json->{error}) && $json->{error}) {
+            print STDERR "[shock error] ".$json->{error}[0]."\n";
             die "[shock error] ".$json->{error}[0].":";
         }
     };
@@ -422,11 +497,14 @@ sub _post_shock_file {
     
     if ($@ || (! $response)) {
         if ((! $@) || ($@ =~ /malformed JSON string/)) {
-            die "[shock error] unable to connect to Shock server:"
+            print STDERR "[shock error] unable to connect to Shock server\n";
+            die "[shock error] unable to connect to Shock server:";
         } else {
+            print STDERR "[shock error] ".$@."\n";
             die "[shock error] ".$@.":";
         }
     } elsif (exists($response->{error}) && $response->{error}) {
+        print STDERR "[shock error] ".$response->{error}[0]."\n";
         die "[shock error] ".$response->{error}[0].":";
     } else {
         return {
@@ -455,6 +533,7 @@ sub _process_args {
             }
         };
         if ($@) {
+            print STDERR "[step error] parameter number ".$i." is not valid, value is not of type '".$p->{type}."'\n";
             die "[step error] parameter number ".$i." is not valid, value is not of type '".$p->{type}."':";
         }
     }
@@ -484,6 +563,7 @@ sub _stringify_args {
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
+            print STDERR "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace\n";
             die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
         }
         # short option
@@ -532,7 +612,7 @@ sub _task_template {
                 }
             }
         },
-        "dependsOn": [[% dependent_tasks %]],
+        "dependsOn": [[% depends_on %]],
         [% inputs %]
         "outputs": {
             "awe_stdout.txt": {

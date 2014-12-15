@@ -36,6 +36,7 @@ deploy-service: | build-libs deploy-libs build-service deploy-cfg
 
 build-service:
 	mkdir -p $(TARGET)/services/$(SERVICE_DIR)
+	mkdir -p $(TARGET)/services/$(SERVICE_DIR)/log
 	$(TPAGE) $(TPAGE_ARGS) service/start_service.tt > $(TARGET)/services/$(SERVICE_DIR)/start_service
 	chmod +x $(TARGET)/services/$(SERVICE_DIR)/start_service
 	$(TPAGE) $(TPAGE_ARGS) service/stop_service.tt > $(TARGET)/services/$(SERVICE_DIR)/stop_service

@@ -40,6 +40,22 @@ close($fh);
 my $url = $ARGV[2];
 my $fba = get_fba_client($url);
 #Running command
-my $output = $fba->$command($parameters);
+my $finalparameters = {};
+foreach my $key (keys(%{$parameters})) {
+	my $array = [split(/:/,$key)];
+	my $current = $finalparameters;
+	for (my $i = 0; $i < @{$array}; $i++) {
+		if (defined($array->[$i+1])) {
+			if (!defined($current->{$array->[$i]})) {
+				$current->{$array->[$i]} = {};
+			}
+			$current = $current->{$array->[$i]};
+		} else {
+			$current->{$array->[$i]} = $parameters->{$key};
+		}
+	}	
+}
+print Data::Dumper->Dump([$finalparameters]);
+my $output = $fba->$command($finalparameters);
 my $JSON = JSON->new->utf8(1);
 print STDOUT $JSON->encode($output);

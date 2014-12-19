@@ -57,7 +57,7 @@ if ($parameters->{input_contigset} =~ m/^\d+$/) {
 	$input->{objid} = $parameters->{input_contigset};
 } else {
 	$input->{name} = $parameters->{input_contigset};
-}	
+}
 my $objdatas = $ws->get_objects([$input]);
 my $obj = $objdatas->[0]->{data};
 my $inputgenome = {
@@ -97,9 +97,9 @@ if (defined($parameters->{call_pyrrolysoproteins}) && $parameters->{call_pyrroly
 if (defined($parameters->{call_features_repeat_region_SEED}) && $parameters->{call_features_repeat_region_SEED} == 1)  {
 	push(@{$workflow->{stages}},{
 		name => "call_features_repeat_region_SEED",
-		"repeat_region_SEED_parameters" : {
-            "min_identity" : "95",
-            "min_length" : "100"
+		"repeat_region_SEED_parameters" => {
+            "min_identity" => "95",
+            "min_length" => "100"
          }
 	});
 }
@@ -118,8 +118,8 @@ if (defined($parameters->{call_features_crispr}) && $parameters->{call_features_
 if (defined($parameters->{call_features_CDS_glimmer3}) && $parameters->{call_features_CDS_glimmer3} == 1)  {
 	push(@{$workflow->{stages}},{
 		name => "call_features_CDS_glimmer3",
-		"glimmer3_parameters" : {
-            "min_training_len" : "2000"
+		"glimmer3_parameters" => {
+            "min_training_len" => "2000"
          }
 	});
 }
@@ -136,8 +136,8 @@ if (defined($parameters->{annotate_proteins_kmer_v2}) && $parameters->{annotate_
 	$simflag = 1;
 	push(@{$workflow->{stages}},{
 		name => "annotate_proteins_kmer_v2",
-		"kmer_v2_parameters" : {
-            "min_hits" : "5"
+		"kmer_v2_parameters" => {
+            "min_hits" => "5"
          }
 	});
 }
@@ -145,24 +145,24 @@ if (defined($parameters->{kmer_v1_parameters}) && $parameters->{kmer_v1_paramete
 	$simflag = 1;
 	push(@{$workflow->{stages}},{
 		name => "annotate_proteins_kmer_v1",
-		 "kmer_v1_parameters" : {
-            "dataset_name" : "Release70",
-            "annotate_hypothetical_only" : $v1flag
-         },
+		 "kmer_v1_parameters" => {
+            "dataset_name" => "Release70",
+            "annotate_hypothetical_only" => $v1flag
+         }
 	});
 }
 if (defined($parameters->{annotate_proteins_similarity}) && $parameters->{annotate_proteins_similarity} == 1)  {
 	push(@{$workflow->{stages}},{
 		name => "annotate_proteins_similarity",
-		"similarity_parameters" : {
-            "annotate_hypothetical_only" : $simflag
+		"similarity_parameters" => {
+            "annotate_hypothetical_only" => $simflag
          }
 	});
 }
 if (defined($parameters->{resolve_overlapping_features}) && $parameters->{resolve_overlapping_features} == 1)  {
 	push(@{$workflow->{stages}},{
 		name => "resolve_overlapping_features",
-		"resolve_overlapping_features_parameters" : {}
+		"resolve_overlapping_features_parameters" => {}
 	});
 }
 if (defined($parameters->{find_close_neighbors}) && $parameters->{find_close_neighbors} == 1)  {

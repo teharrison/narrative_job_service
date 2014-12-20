@@ -42,18 +42,20 @@ my $fba = get_fba_client($url);
 #Running command
 my $finalparameters = {};
 foreach my $key (keys(%{$parameters})) {
-	my $array = [split(/:/,$key)];
-	my $current = $finalparameters;
-	for (my $i = 0; $i < @{$array}; $i++) {
-		if (defined($array->[$i+1])) {
-			if (!defined($current->{$array->[$i]})) {
-				$current->{$array->[$i]} = {};
+	if (length($parameters->{$key}) > 0) {
+		my $array = [split(/:/,$key)];
+		my $current = $finalparameters;
+		for (my $i = 0; $i < @{$array}; $i++) {
+			if (defined($array->[$i+1])) {
+				if (!defined($current->{$array->[$i]})) {
+					$current->{$array->[$i]} = {};
+				}
+				$current = $current->{$array->[$i]};
+			} else {
+				$current->{$array->[$i]} = $parameters->{$key};
 			}
-			$current = $current->{$array->[$i]};
-		} else {
-			$current->{$array->[$i]} = $parameters->{$key};
 		}
-	}	
+	}
 }
 print Data::Dumper->Dump([$finalparameters]);
 my $output = $fba->$command($finalparameters);

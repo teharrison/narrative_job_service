@@ -29,7 +29,7 @@ if (!defined($ARGV[1])) {
 	$ARGV[1] = "parameters.json";
 }
 if (!defined($ARGV[2])) {
-	$ARGV[2] = "http://kbase.us/services/genome_annotation";
+	$ARGV[2] = "http://tutorial.theseed.org/services/genome_annotation";
 }
 if (!defined($ARGV[3])) {
 	$ARGV[3] = "http://kbase.us/services/ws";
@@ -171,6 +171,8 @@ if (defined($parameters->{find_close_neighbors}) && $parameters->{find_close_nei
 if (defined($parameters->{call_features_prophage_phispy}) && $parameters->{call_features_prophage_phispy} == 1)  {
 	push(@{$workflow->{stages}},{name => "call_features_prophage_phispy"});
 }
+#my $JSON = JSON->new->utf8(1);
+#print STDOUT "Input genome:\n".$JSON->encode($inputgenome)."\n";
 my $genome = $gaserv->run_pipeline($inputgenome, $workflow);
 $genome->{gc_content} = 0.5;
 if (defined($genome->{gc})) {
@@ -213,6 +215,15 @@ if (defined($genome->{features})) {
 		}
 		if (defined($ftr->{dna_sequence})) {
 			$ftr->{dna_sequence_length} = length($ftr->{dna_sequence})+0;
+		}
+		if (defined($ftr->{quality}->{weighted_hit_count})) {
+			$ftr->{quality}->{weighted_hit_count} = $ftr->{quality}->{weighted_hit_count}+0;
+		}
+		if (defined($ftr->{quality}->{hit_count})) {
+			$ftr->{quality}->{hit_count} = $ftr->{quality}->{hit_count}+0;
+		}
+		if (defined($ftr->{annotations})) {
+			delete $ftr->{annotations};
 		}
 		if (defined($ftr->{location})) {
 			$ftr->{location}->[0]->[1] = $ftr->{location}->[0]->[1]+0;

@@ -57,7 +57,6 @@ foreach my $key (keys(%{$parameters})) {
 		}
 	}
 }
-print Data::Dumper->Dump([$finalparameters]);
 my $output = $fba->$command($finalparameters);
 my $JSON = JSON->new->utf8(1);
 print STDOUT $JSON->encode($output);

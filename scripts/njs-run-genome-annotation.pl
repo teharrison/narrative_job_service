@@ -53,25 +53,54 @@ if ($parameters->{workspace} =~ m/^\d+$/) {
 } else {
 	$input->{workspace} = $parameters->{workspace};
 }
-if ($parameters->{input_contigset} =~ m/^\d+$/) {
-	$input->{objid} = $parameters->{input_contigset};
+my $inputgenome;
+my $contigsetref;
+if (defined($parameters->{input_genome})) {
+	if ($parameters->{input_genome} =~ m/^\d+$/) {
+		$input->{objid} = $parameters->{input_genome};
+	} else {
+		$input->{name} = $parameters->{input_genome};
+	}
+	my $objdatas = $ws->get_objects([$input]);
+	$inputgenome = $objdatas->[0]->{data};
+	if (defined($inputgenome->{contigset_ref}) && $inputgenome->{contigset_ref} =~ m/^([^\/]+)\/([^\/]+)/) {
+		$contigsetref = $inputgenome->{contigset_ref};
+		my $contigws = $1;
+		$parameters->{input_contigset} = $2;
+		$input = {};
+		if ($contigws =~ m/^\d+$/) {
+			$input->{wsid} = $contigws;
+		} else {
+			$input->{workspace} = $contigws;
+		}
+	}
+	$parameters->{genetic_code} = $inputgenome->{genetic_code};
+	$parameters->{domain} = $inputgenome->{domain};
+	$parameters->{scientific_name} = $inputgenome->{scientific_name};
 } else {
-	$input->{name} = $parameters->{input_contigset};
+	$inputgenome = {
+		id => $parameters->{output_genome},
+		genetic_code => $parameters->{genetic_code},
+		scientific_name => $parameters->{scientific_name},
+		domain => $parameters->{domain},
+		contigs => []
+	};
 }
-my $objdatas = $ws->get_objects([$input]);
-my $obj = $objdatas->[0]->{data};
-my $inputgenome = {
-	id => $parameters->{output_genome},
-	genetic_code => $parameters->{genetic_code},
-	scientific_name => $parameters->{scientific_name},
-	domain => "B",
-	contigs => []
-};
-for (my $i=0; $i < @{$obj->{contigs}}; $i++) {
-	push(@{$inputgenome->{contigs}},{
-		dna => $obj->{contigs}->[$i]->{sequence},
-		id => $obj->{contigs}->[$i]->{id}
-	});
+if (defined($parameters->{input_contigset})) {
+	if ($parameters->{input_contigset} =~ m/^\d+$/) {
+		$input->{objid} = $parameters->{input_contigset};
+	} else {
+		$input->{name} = $parameters->{input_contigset};
+	}
+	my $objdatas = $ws->get_objects([$input]);
+	my $obj = $objdatas->[0]->{data};
+	for (my $i=0; $i < @{$obj->{contigs}}; $i++) {
+		push(@{$inputgenome->{contigs}},{
+			dna => $obj->{contigs}->[$i]->{sequence},
+			id => $obj->{contigs}->[$i]->{id}
+		});
+	}
+	$contigsetref = $objdatas->[0]->{info}->[6]."/".$objdatas->[0]->{info}->[0]."/".$objdatas->[0]->{info}->[4];	
 }
 my $gaserv;
 if ($ARGV[2] eq "impl") {
@@ -171,8 +200,6 @@ if (defined($parameters->{find_close_neighbors}) && $parameters->{find_close_nei
 if (defined($parameters->{call_features_prophage_phispy}) && $parameters->{call_features_prophage_phispy} == 1)  {
 	push(@{$workflow->{stages}},{name => "call_features_prophage_phispy"});
 }
-#my $JSON = JSON->new->utf8(1);
-#print STDOUT "Input genome:\n".$JSON->encode($inputgenome)."\n";
 my $genome = $gaserv->run_pipeline($inputgenome, $workflow);
 $genome->{gc_content} = 0.5;
 if (defined($genome->{gc})) {
@@ -201,7 +228,7 @@ if (defined($genome->{contigs})) {
 	}
 	$genome->{dna_size} = length($str)+0;
 	$genome->{md5} = Digest::MD5::md5_hex($str);
-	$genome->{contigset_ref} = $objdatas->[0]->{info}->[6]."/".$objdatas->[0]->{info}->[0]."/".$objdatas->[0]->{info}->[4];
+	$genome->{contigset_ref} = $contigsetref;
 }
 if (defined($genome->{features})) {
 	for (my $i=0; $i < @{$genome->{features}}; $i++) {

@@ -55,6 +55,20 @@ foreach my $key (keys(%{$parameters})) {
 				$current->{$array->[$i]} = $parameters->{$key};
 			}
 		}
+		if ($key eq "community_submodel_ids") {
+			$finalparameters->{models} = [];
+			for (my $i=0; $i < @{$finalparameters->{community_submodel_ids}}; $i++) {
+				push(@{$finalparameters->{models}},[$finalparameters->{community_submodel_ids}->[$i],$finalparameters->{workspace},1]);
+			}
+			delete $finalparameters->{community_submodel_ids};
+		}
+		if ($key =~ m/workspaces$/) {
+			my $idkey = $finalparameters->{$key};
+			$finalparameters->{$key} = [];
+			for (my $i=0; $i < @{$finalparameters->{$idkey}}; $i++) {
+				push(@{$finalparameters->{$key}},$finalparameters->{workspace});
+			}
+		}
 	}
 }
 my $output = $fba->$command($finalparameters);

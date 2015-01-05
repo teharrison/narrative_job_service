@@ -40,6 +40,37 @@ close($fh);
 my $url = $ARGV[2];
 my $fba = get_fba_client($url);
 #Running command
-my $output = $fba->$command($parameters);
+my $finalparameters = {};
+foreach my $key (keys(%{$parameters})) {
+	if (length($parameters->{$key}) > 0) {
+		my $array = [split(/:/,$key)];
+		my $current = $finalparameters;
+		for (my $i = 0; $i < @{$array}; $i++) {
+			if (defined($array->[$i+1])) {
+				if (!defined($current->{$array->[$i]})) {
+					$current->{$array->[$i]} = {};
+				}
+				$current = $current->{$array->[$i]};
+			} else {
+				$current->{$array->[$i]} = $parameters->{$key};
+			}
+		}
+		if ($key eq "community_submodel_ids") {
+			$finalparameters->{models} = [];
+			for (my $i=0; $i < @{$finalparameters->{community_submodel_ids}}; $i++) {
+				push(@{$finalparameters->{models}},[$finalparameters->{community_submodel_ids}->[$i],$finalparameters->{workspace},1]);
+			}
+			delete $finalparameters->{community_submodel_ids};
+		}
+		if ($key =~ m/workspaces$/) {
+			my $idkey = $finalparameters->{$key};
+			$finalparameters->{$key} = [];
+			for (my $i=0; $i < @{$finalparameters->{$idkey}}; $i++) {
+				push(@{$finalparameters->{$key}},$finalparameters->{workspace});
+			}
+		}
+	}
+}
+my $output = $fba->$command($finalparameters);
 my $JSON = JSON->new->utf8(1);
 print STDOUT $JSON->encode($output);

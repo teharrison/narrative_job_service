@@ -579,19 +579,19 @@ sub _minify_args {
 sub _stringify_args {
     my ($self, $params) = @_;
     my $arg_min = $self->_minify_args($params); # use this to unroll arrays
-    my $arg_list = [];
+    my @arg_list = ();
     foreach my $arg (@$arg_min) {
         # short option
-        if (length($p->{label}) == 1) {
-            push @arg_list, "-".$p->{label};
+        if (length($arg->{label}) == 1) {
+            push @arg_list, "-".$arg->{label};
         }
         # long option
-        elsif (length($p->{label}) > 1) {
-            push @arg_list, "--".$p->{label};
+        elsif (length($arg->{label}) > 1) {
+            push @arg_list, "--".$arg->{label};
         }
         # has value
-        if ($p->{value}) {
-            push @arg_list, $p->{value};
+        if ($arg->{value}) {
+            push @arg_list, $arg->{value};
         }
     }
     return join(" ", @arg_list);

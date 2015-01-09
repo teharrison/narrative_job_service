@@ -125,6 +125,7 @@ sub readConfig {
 #{
 #    string job_id;
 #    string job_state;
+#    int position;
 #    string running_step_id;
 #    mapping<string, string> step_outputs;
 #    mapping<string, string> step_errors;
@@ -272,10 +273,16 @@ sub check_app_state {
     my $output = {
         job_id          => $job->{id},
         job_state       => $job->{state},
+        position        => 0,
         running_step_id => "",
         step_outputs    => {},
         step_errors     => {}
     };
+    # get position
+    my $result = $self->_awe_action('job', $job_id, 'get', 'position');
+    if ($result->{position}) {
+        $output->{position} = $result->{position};
+    }
     # parse each task
     # assume each task has 1 workunit
     foreach my $task (@{$job->{tasks}}) {
@@ -402,6 +409,10 @@ sub _awe_action {
         # special exception for empty stdout / stderr
         if ($err =~ /^log type .* not found$/) {
             return "";
+        }
+        # special exception for position query
+        if ($options eq 'position') {
+            return {"position" => 0};
         }
         # make message more useful
         elsif ($err eq "Not Found") {

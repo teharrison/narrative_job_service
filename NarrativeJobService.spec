@@ -68,6 +68,7 @@ module NarrativeJobService {
     /*
         job_id - id of job running app
         job_state - 'queued', 'running', 'completed', or 'error'
+        position - position of job in the queue
         running_step_id - id of step currently running
         step_outputs - mapping step_id to stdout text produced by step, only for completed or errored steps
         step_outputs - mapping step_id to stderr text produced by step, only for completed or errored steps
@@ -75,6 +76,7 @@ module NarrativeJobService {
     typedef structure {
         string job_id;
         string job_state;
+        int position;
         string running_step_id;
         mapping<string, string> step_outputs;
         mapping<string, string> step_errors;

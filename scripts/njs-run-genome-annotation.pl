@@ -219,7 +219,7 @@ if (!defined($genome->{source})) {
 	$genome->{source} = "KBase";
 	$genome->{source_id} = $genome->{id};
 }
-if (defined($genome->{contigs})) {
+if ( defined($genome->{contigs}) && scalar(@{$genome->{contigs}})>0 ) {
 	my $label = "dna";
 	if (defined($genome->{contigs}->[0]->{seq})) {
 		$label = "seq";

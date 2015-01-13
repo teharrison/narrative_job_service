@@ -411,7 +411,7 @@ sub _awe_action {
             return "";
         }
         # special exception for position query
-        if ($options eq 'position') {
+        if ($options && ($options eq 'position')) {
             return {"position" => 0};
         }
         # make message more useful

@@ -532,6 +532,10 @@ sub _hashify_args {
             print STDERR "[step error] parameter number ".$i." is not valid, label is missing\n";
             die "[step error] parameter number ".$i." is not valid, label is missing:";
         }
+        unless ($p->{type}) {
+            print STDERR "[step error] parameter number ".$i." is not valid, type is missing\n";
+            die "[step error] parameter number ".$i." is not valid, type is missing:";
+        }
         eval {
             if ($p->{type} eq 'string') {
                 $arg_hash->{$p->{label}} = $p->{value};
@@ -560,6 +564,10 @@ sub _minify_args {
         if ($p->{label} =~ /\s/) {
             print STDERR "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace\n";
             die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
+        }
+        unless ($p->{type}) {
+            print STDERR "[step error] parameter number ".$i." is not valid, type is missing\n";
+            die "[step error] parameter number ".$i." is not valid, type is missing:";
         }
         if ($p->{type} eq 'array') {
             my $val_array = $self->json->decode($p->{value});

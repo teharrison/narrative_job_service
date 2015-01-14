@@ -280,8 +280,10 @@ sub check_app_state {
     };
     # get position
     my $result = $self->_awe_action('job', $job_id, 'get', 'position');
-    if ($result->{position}) {
-        $output->{position} = $result->{position};
+    if (ref($result) && (ref($result) eq 'HASH')) {
+        if ($result->{position}) {
+            $output->{position} = $result->{position};
+        }
     }
     # parse each task
     # assume each task has 1 workunit

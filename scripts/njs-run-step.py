@@ -4,10 +4,13 @@ import json
 import os
 import subprocess
 import sys
+import glob
 from optparse import OptionParser
 
 VERSION = '1'
 AUTH_LIST = "Jared Bischof, Travis Harrison, Folker Meyer, Tobias Paczian, Andreas Wilke"
+WS_NAME = ""
+OUT_DIR = "workspace_output"
 
 prehelp = """
 NAME
@@ -64,6 +67,7 @@ AUTHORS
 #}]
 
 def get_cmd_args(params_array):
+    global WS_NAME
     params = []
     for i, p in enumerate(params_array):
         # validate general
@@ -78,6 +82,8 @@ def get_cmd_args(params_array):
             if not (("is_input" in p) and ("workspace_name" in p) and ("object_type" in p)):
                 sys.stderr.write("[error] parameter number %d is not valid because it is missing workspace information.\n"%(i))
                 return False, []
+            else:
+                WS_NAME = p["workspace_name"]
         # short option
         if len(p["label"]) == 1:
             params.append("-"+p["label"])
@@ -113,31 +119,36 @@ def check_for_ws_cmds(params_array):
     return True
 
 def download_ws_objects(params_array):
-    for i, p in enumerate(params_array):
+    for p in params_array:
         if ("is_workspace_id" in p) and p["is_workspace_id"] and p["is_input"]:
-            set_ws(p["workspace_name"], i)
+            set_ws(p["workspace_name"])
             ws_cmd = ['ws-get', p["value"]]
             ws_file = open(p["value"], 'w')
             if subprocess.call(ws_cmd, stdout=ws_file, stderr=sys.stderr) != 0:
-                sys.stderr.write("[error] can not download from workspace for parameter number %d.\n"%(i))
+                sys.stderr.write("[error] can not download from workspace: %s/%s.\n"%(p["workspace_name"], p["value"]))
                 return False
             ws_file.close()
     return True
 
 def upload_ws_objects(params_array):
-    for i, p in enumerate(params_array):
+    for p in params_array:
         if ("is_workspace_id" in p) and p["is_workspace_id"] and (not p["is_input"]):
-            set_ws(p["workspace_name"], i)
-            ws_cmd = ['ws-load', p["object_type"], p["value"], p["value"]]
-            if subprocess.call(ws_cmd, stdout=sys.stdout, stderr=sys.stderr) != 0:
-                sys.stderr.write("[error] can not upload to workspace for parameter number %d.\n"%(i))
+            if not upload_ws_obj(p["workspace_name"], p["object_type"], p["value"], p["value"]):
                 return False
     return True
 
-def set_ws(ws_name, num):
+def upload_ws_obj(ws_name, obj_type, obj_id, obj_file):
+    set_ws(ws_name)
+    ws_cmd = ['ws-load', obj_type, obj_id, obj_file]
+    if subprocess.call(ws_cmd, stdout=sys.stdout, stderr=sys.stderr) != 0:
+        sys.stderr.write("[error] can not upload to workspace: %s/%s.\n"%(ws_name, obj_id))
+        return False
+    return False
+
+def set_ws(ws_name):
     ws_cmd = ['ws-workspace', ws_name]
     if subprocess.call(ws_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0:
-        sys.stderr.write("[error] can not set workspace for parameter number %d.\n"%(num))
+        sys.stderr.write("[error] can not set workspace %s.\n"%(ws_name))
         return False
     return True
 
@@ -195,7 +206,16 @@ def main(args):
     # upload
     if not upload_ws_objects(params_array):
         return 1
-
+    # optional upload
+    if os.path.isdir(OUT_DIR) and WS_NAME:
+        objects = map(lambda x: os.path.splitext(os.path.basename(x))[0], glob.glob(os.path.join(opts.outdir, '*.obj')))
+        types = map(lambda x: os.path.splitext(os.path.basename(x))[0], glob.glob(os.path.join(opts.outdir, '*.type')))
+        for obj in objects:
+            if obj in types:
+                obj_type = open(os.path.join(opts.outdir, obj+'.type'), 'r').read().strip()
+                if not upload_ws_obj(WS_NAME, obj_type, obj, os.path.join(opts.outdir, obj+'.obj')):
+                    return 1
+    # done
     return 0
 
 if __name__ == "__main__":

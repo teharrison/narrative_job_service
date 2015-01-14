@@ -55,6 +55,7 @@ if ($parameters->{workspace} =~ m/^\d+$/) {
 }
 my $inputgenome;
 my $contigsetref;
+my $oldfunchash = {};
 if (defined($parameters->{input_genome})) {
 	if ($parameters->{input_genome} =~ m/^\d+$/) {
 		$input->{objid} = $parameters->{input_genome};
@@ -72,6 +73,12 @@ if (defined($parameters->{input_genome})) {
 			$input->{wsid} = $contigws;
 		} else {
 			$input->{workspace} = $contigws;
+		}
+	}
+	for (my $i=0; $i < @{$inputgenome->{features}}; $i++) {
+		if (lc($inputgenome->{features}->[$i]->{type}) eq "cds" || lc($inputgenome->{features}->[$i]->{type}) eq "peg") {
+			$oldfunchash->{$inputgenome->{features}->[$i]->{id}} = $inputgenome->{features}->[$i]->{function};
+			$inputgenome->{features}->[$i]->{function} = "hypothetical protein";
 		}
 	}
 	$parameters->{genetic_code} = $inputgenome->{genetic_code};
@@ -166,7 +173,8 @@ if (defined($parameters->{annotate_proteins_kmer_v2}) && $parameters->{annotate_
 	push(@{$workflow->{stages}},{
 		name => "annotate_proteins_kmer_v2",
 		"kmer_v2_parameters" => {
-            "min_hits" => "5"
+            "min_hits" => "5",
+            "annotate_hypothetical_only" => 1
          }
 	});
 }
@@ -233,6 +241,11 @@ if ( defined($genome->{contigs}) && scalar(@{$genome->{contigs}})>0 ) {
 if (defined($genome->{features})) {
 	for (my $i=0; $i < @{$genome->{features}}; $i++) {
 		my $ftr = $genome->{features}->[$i];
+		if (defined($oldfunchash->{$ftr->{id}}) && (!defined($ftr->{function}) || $ftr->{function} =~ /hypothetical\sprotein/)) {
+			if (defined($parameters->{retain_old_anno_for_hypotheticals}) && $parameters->{retain_old_anno_for_hypotheticals} == 1)  {
+				$ftr->{function} = $oldfunchash->{$ftr->{id}};
+			}
+		}
 		if (!defined($ftr->{type}) && $ftr->{id} =~ m/(\w+)\.\d+$/) {
 			$ftr->{type} = $1;
 		}

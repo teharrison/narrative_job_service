@@ -236,10 +236,11 @@ sub compose_app {
                 "--param_file",
                 "@".$fname,
                 "--ws_url",
-                $self->ws_url,
-                "--service_url",
-                $service->{service_url}
+                $self->ws_url
             ));
+            if ($service->{service_url}) {
+                $task_vars->{arg_list} .= "--service_url ".$service->{service_url};
+            }
         }
         # script step
         elsif ($step->{type} eq 'script') {

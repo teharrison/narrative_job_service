@@ -542,6 +542,7 @@ sub _post_shock_file {
 }
 
 # treat array as json array
+# this is for service mode
 sub _hashify_args {
     my ($self, $params) = @_;
     my $arg_hash = {};
@@ -575,6 +576,7 @@ sub _hashify_args {
 }
 
 # treat array as multiple inputs of same label
+# this is for script mode with workspace input and/or output
 sub _minify_args {
     my ($self, $params) = @_;
     my $arg_min = [];
@@ -591,6 +593,9 @@ sub _minify_args {
         if ($p->{type} eq 'array') {
             my $val_array = $self->json->decode($p->{value});
             foreach my $val (@$val_array) {
+                if (! $val) {
+                    next;
+                }
                 push @$arg_min, {
                     label           => $p->{label},
                     value           => $val,
@@ -614,6 +619,7 @@ sub _minify_args {
     return $arg_min;
 }
 
+# this is for script mode with no workspace input and/or output
 sub _stringify_args {
     my ($self, $params) = @_;
     my $arg_min = $self->_minify_args($params); # use this to unroll arrays

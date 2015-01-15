@@ -143,7 +143,7 @@ def upload_ws_obj(ws_name, obj_type, obj_id, obj_file):
     if subprocess.call(ws_cmd, stdout=sys.stdout, stderr=sys.stderr) != 0:
         sys.stderr.write("[error] can not upload to workspace: %s/%s.\n"%(ws_name, obj_id))
         return False
-    return False
+    return True
 
 def set_ws(ws_name):
     ws_cmd = ['ws-workspace', ws_name]
@@ -208,12 +208,12 @@ def main(args):
         return 1
     # optional upload
     if os.path.isdir(OUT_DIR) and WS_NAME:
-        objects = map(lambda x: os.path.splitext(os.path.basename(x))[0], glob.glob(os.path.join(opts.outdir, '*.obj')))
-        types = map(lambda x: os.path.splitext(os.path.basename(x))[0], glob.glob(os.path.join(opts.outdir, '*.type')))
+        objects = map(lambda x: os.path.splitext(os.path.basename(x))[0], glob.glob(os.path.join(OUT_DIR, '*.obj')))
+        types = map(lambda x: os.path.splitext(os.path.basename(x))[0], glob.glob(os.path.join(OUT_DIR, '*.type')))
         for obj in objects:
             if obj in types:
-                obj_type = open(os.path.join(opts.outdir, obj+'.type'), 'r').read().strip()
-                if not upload_ws_obj(WS_NAME, obj_type, obj, os.path.join(opts.outdir, obj+'.obj')):
+                obj_type = open(os.path.join(OUT_DIR, obj+'.type'), 'r').read().strip()
+                if not upload_ws_obj(WS_NAME, obj_type, obj, os.path.join(OUT_DIR, obj+'.obj')):
                     return 1
     # done
     return 0

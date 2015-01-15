@@ -230,7 +230,16 @@ sub compose_app {
             my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
             $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
             $task_vars->{cmd_name} = $self->service_wrappers->{$service->{service_name}};
-            $task_vars->{arg_list} = $service->{method_name}." @".$fname." ".$service->{service_url};
+            $task_vars->{arg_list} = join(" ", (
+                "--command",
+                $service->{method_name},
+                "--param_file",
+                "@".$fname,
+                "--ws_url",
+                $self->ws_url,
+                "--service_url",
+                $service->{service_url}
+            ));
         }
         # script step
         elsif ($step->{type} eq 'script') {
@@ -241,7 +250,14 @@ sub compose_app {
                 my $input_hash = $self->_post_shock_file($in_attr, $arg_min, $fname);
                 $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
                 $task_vars->{cmd_name} = $self->script_wrapper;
-                $task_vars->{arg_list} = "--params @".$fname." ".$service->{method_name};
+                $task_vars->{arg_list} = join(" ", (
+                    "--command",
+                    $service->{method_name},
+                    "--param_file",
+                    "@".$fname,
+                    "--ws_url",
+                    $self->ws_url
+                ));
             }
             # run given cmd
             else {

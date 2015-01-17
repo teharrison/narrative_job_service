@@ -23,6 +23,8 @@ module NarrativeJobService {
     /*
         label - label of parameter, can be empty string for positional parameters
         value - value of parameter
+        type - type of parameter: 'string', 'int', 'float', or 'array'
+               will be cast to given type when submitted
         step_source - step_id that parameter derives from
         is_workspace_id - parameter is a workspace id (value is object name)
         # the below are only used if is_workspace_id is true
@@ -40,6 +42,7 @@ module NarrativeJobService {
     typedef structure {
         string label;
         string value;
+        string type;
         string step_source;
         boolean is_workspace_id;
         workspace_object ws_object;
@@ -65,6 +68,7 @@ module NarrativeJobService {
     /*
         job_id - id of job running app
         job_state - 'queued', 'running', 'completed', or 'error'
+        position - position of job in the queue
         running_step_id - id of step currently running
         step_outputs - mapping step_id to stdout text produced by step, only for completed or errored steps
         step_outputs - mapping step_id to stderr text produced by step, only for completed or errored steps
@@ -72,6 +76,7 @@ module NarrativeJobService {
     typedef structure {
         string job_id;
         string job_state;
+        int position;
         string running_step_id;
         mapping<string, string> step_outputs;
         mapping<string, string> step_errors;

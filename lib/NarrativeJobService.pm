@@ -125,6 +125,7 @@ sub readConfig {
 #{
 #    string job_id;
 #    string job_state;
+#    int position;
 #    string running_step_id;
 #    mapping<string, string> step_outputs;
 #    mapping<string, string> step_errors;
@@ -272,10 +273,18 @@ sub check_app_state {
     my $output = {
         job_id          => $job->{id},
         job_state       => $job->{state},
+        position        => 0,
         running_step_id => "",
         step_outputs    => {},
         step_errors     => {}
     };
+    # get position
+    my $result = $self->_awe_action('job', $job_id, 'get', 'position');
+    if (ref($result) && (ref($result) eq 'HASH')) {
+        if ($result->{position}) {
+            $output->{position} = $result->{position};
+        }
+    }
     # parse each task
     # assume each task has 1 workunit
     foreach my $task (@{$job->{tasks}}) {
@@ -403,6 +412,10 @@ sub _awe_action {
         if ($err =~ /^log type .* not found$/) {
             return "";
         }
+        # special exception for position query
+        if ($options && ($options eq 'position')) {
+            return {"position" => 0};
+        }
         # make message more useful
         elsif ($err eq "Not Found") {
             $err = "$type $id does not exist";
@@ -511,6 +524,7 @@ sub _post_shock_file {
     }
 }
 
+# treat array as json array
 sub _hashify_args {
     my ($self, $params) = @_;
     my $arg_hash = {};
@@ -520,48 +534,85 @@ sub _hashify_args {
             print STDERR "[step error] parameter number ".$i." is not valid, label is missing\n";
             die "[step error] parameter number ".$i." is not valid, label is missing:";
         }
-        $arg_hash->{$p->{label}} = $p->{value};
+        unless ($p->{type}) {
+            print STDERR "[step error] parameter number ".$i." is not valid, type is missing\n";
+            die "[step error] parameter number ".$i." is not valid, type is missing:";
+        }
+        eval {
+            if ($p->{type} eq 'string') {
+                $arg_hash->{$p->{label}} = $p->{value};
+            } elsif ($p->{type} eq 'int') {
+                $arg_hash->{$p->{label}} = int($p->{value});
+            } elsif ($p->{type} eq 'float') {
+                $arg_hash->{$p->{label}} = $p->{value} * 1.0;
+            } elsif ($p->{type} eq 'array') {
+                $arg_hash->{$p->{label}} = $self->json->decode($p->{value});
+            }
+        };
+        if ($@) {
+            print STDERR "[step error] parameter number ".$i." is not valid, value is not of type '".$p->{type}."'\n";
+            die "[step error] parameter number ".$i." is not valid, value is not of type '".$p->{type}."':";
+        }
     }
     return $arg_hash;
 }
 
+# treat array as multiple inputs of same label
 sub _minify_args {
     my ($self, $params) = @_;
     my $arg_min = [];
-    for (my $i=0; $i<@$params; $i++) {
-        my $p = $params->[$i];
-        $arg_min->[$i] = {
-            label           => $p->{label},
-            value           => $p->{value},
-            is_workspace_id => $p->{is_workspace_id},
-            is_input        => $p->{ws_object}{is_input},
-            workspace_name  => $p->{ws_object}{workspace_name},
-            object_type     => $p->{ws_object}{object_type}
-        };
-    }
-    return $arg_min;
-}
-
-sub _stringify_args {
-    my ($self, $params) = @_;
-    my @arg_list = ();
     for (my $i=0; $i<@$params; $i++) {
         my $p = $params->[$i];
         if ($p->{label} =~ /\s/) {
             print STDERR "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace\n";
             die "[step error] parameter number ".$i." is not valid, label '".$p->{label}."' may not contain whitspace:";
         }
+        unless ($p->{type}) {
+            print STDERR "[step error] parameter number ".$i." is not valid, type is missing\n";
+            die "[step error] parameter number ".$i." is not valid, type is missing:";
+        }
+        if ($p->{type} eq 'array') {
+            my $val_array = $self->json->decode($p->{value});
+            foreach my $val (@$val_array) {
+                push @$arg_min, {
+                    label           => $p->{label},
+                    value           => $val,
+                    is_workspace_id => $p->{is_workspace_id},
+                    is_input        => $p->{ws_object}{is_input},
+                    workspace_name  => $p->{ws_object}{workspace_name},
+                    object_type     => $p->{ws_object}{object_type}
+                };
+            }
+        } else {
+            push @$arg_min, {
+                label           => $p->{label},
+                value           => $p->{value},
+                is_workspace_id => $p->{is_workspace_id},
+                is_input        => $p->{ws_object}{is_input},
+                workspace_name  => $p->{ws_object}{workspace_name},
+                object_type     => $p->{ws_object}{object_type}
+            };
+        }
+    }
+    return $arg_min;
+}
+
+sub _stringify_args {
+    my ($self, $params) = @_;
+    my $arg_min = $self->_minify_args($params); # use this to unroll arrays
+    my @arg_list = ();
+    foreach my $arg (@$arg_min) {
         # short option
-        elsif (length($p->{label}) == 1) {
-            push @arg_list, "-".$p->{label};
+        if (length($arg->{label}) == 1) {
+            push @arg_list, "-".$arg->{label};
         }
         # long option
-        elsif (length($p->{label}) > 1) {
-            push @arg_list, "--".$p->{label};
+        elsif (length($arg->{label}) > 1) {
+            push @arg_list, "--".$arg->{label};
         }
         # has value
-        if ($p->{value}) {
-            push @arg_list, $p->{value};
+        if ($arg->{value}) {
+            push @arg_list, $arg->{value};
         }
     }
     return join(" ", @arg_list);
@@ -597,7 +648,7 @@ sub _task_template {
                 }
             }
         },
-        "dependsOn": [[% dependent_tasks %]],
+        "dependsOn": [[% depends_on %]],
         [% inputs %]
         "outputs": {
             "awe_stdout.txt": {

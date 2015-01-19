@@ -10,34 +10,39 @@ use warnings;
 use JSON::XS;
 use DateTime;
 use Digest::MD5;
+use Getopt::Long;
 use Bio::KBase::GenomeAnnotation::Client;
-use Bio::KBase::workspace::ScriptHelpers qw( get_ws_client workspace workspaceURL parseObjectMeta parseWorkspaceMeta printObjectMeta);
+use Bio::KBase::workspace::ScriptHelpers qw(get_ws_client workspace workspaceURL parseObjectMeta parseWorkspaceMeta printObjectMeta);
+
 #Defining globals describing behavior
-my $usage = "Usage:\nnjs-run-genome-annotation <Command name> <Parameters file> <Service URL> <Workspace URL>\n";
-if (defined($ARGV[0]) && $ARGV[0] eq "-h") {
-	print $usage;
-	exit 0;
+my $command     = "annotate_genome";
+my $param_file  = "parameters.json";
+my $service_url = "http://tutorial.theseed.org/services/genome_annotation";
+my $ws_url  = "http://kbase.us/services/ws";
+my $help    = 0;
+my $usage   = "Usage:\nnjs-run-genome-annotation --command <Command name> --param_file <Parameters file> --service_url <Service URL> --ws_url <Workspace URL>\n";
+my $options = GetOptions (
+    "command=s"     => \$command,
+	"param_file=s"  => \$param_file,
+	"service_url=s" => \$service_url,
+	"ws_url=s"      => \$ws_url,
+	"help!"         => \$help
+);
+if ($help){
+    print $usage;
+    exit 0;
 }
-if (!defined($ARGV[0])) {
-	$ARGV[0] = "annotate_genome";
-}
-if ($ARGV[0] ne "annotate_genome") {
-    print "[error] only command 'annotate_genome' is currently supported\n$usage";
+if ($command ne "annotate_genome") {
+    print STDERR "[error] only command 'annotate_genome' is currently supported\n$usage";
     exit 1;
 }
-if (!defined($ARGV[1])) {
-	$ARGV[1] = "parameters.json";
+if (! -e $param_file) {
+    print STDERR "[error] parameter file is missing\n$usage";
+    exit 1;
 }
-if (!defined($ARGV[2])) {
-	$ARGV[2] = "http://tutorial.theseed.org/services/genome_annotation";
-}
-if (!defined($ARGV[3])) {
-	$ARGV[3] = "http://kbase.us/services/ws";
-}
-#Selecting command
-my $command = $ARGV[0];
+
 #Loading parameters from file
-open( my $fh, "<", $ARGV[1]);
+open(my $fh, "<", $param_file);
 my $parameters;
 {
     local $/;
@@ -45,8 +50,9 @@ my $parameters;
     $parameters = decode_json $str;
 }
 close($fh);
+
 #Retrieving service client or server object
-my $ws = get_ws_client($ARGV[3]);
+my $ws = get_ws_client($ws_url);
 my $input = {};
 if ($parameters->{workspace} =~ m/^\d+$/) {
 	$input->{wsid} = $parameters->{workspace};
@@ -108,13 +114,15 @@ if (defined($parameters->{input_contigset})) {
 		});
 	}
 	$contigsetref = $objdatas->[0]->{info}->[6]."/".$objdatas->[0]->{info}->[0]."/".$objdatas->[0]->{info}->[4];	
+}elsif(!defined($inputgenome->{contigs})){
+    $inputgenome->{contigs} = [];
 }
 my $gaserv;
-if ($ARGV[2] eq "impl") {
+if ($service_url eq "impl") {
 	require "Bio/KBase/GenomeAnnotation/GenomeAnnotationImpl.pm";
 	$gaserv = Bio::KBase::GenomeAnnotation::GenomeAnnotationImpl->new();
 } else {
-	$gaserv = Bio::KBase::GenomeAnnotation::Client->new($ARGV[2]);
+	$gaserv = Bio::KBase::GenomeAnnotation::Client->new($service_url);
 }
 my $workflow = {stages => []};
 if (defined($parameters->{call_features_rRNA_SEED}) && $parameters->{call_features_rRNA_SEED} == 1)  {

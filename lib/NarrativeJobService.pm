@@ -230,7 +230,17 @@ sub compose_app {
             my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
             $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
             $task_vars->{cmd_name} = $self->service_wrappers->{$service->{service_name}};
-            $task_vars->{arg_list} = $service->{method_name}." @".$fname." ".$service->{service_url};
+            $task_vars->{arg_list} = join(" ", (
+                "--command",
+                $service->{method_name},
+                "--param_file",
+                "@".$fname,
+                "--ws_url",
+                $self->ws_url
+            ));
+            if ($service->{service_url}) {
+                $task_vars->{arg_list} .= "--service_url ".$service->{service_url};
+            }
         }
         # script step
         elsif ($step->{type} eq 'script') {
@@ -241,7 +251,14 @@ sub compose_app {
                 my $input_hash = $self->_post_shock_file($in_attr, $arg_min, $fname);
                 $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
                 $task_vars->{cmd_name} = $self->script_wrapper;
-                $task_vars->{arg_list} = "--params @".$fname." ".$service->{method_name};
+                $task_vars->{arg_list} = join(" ", (
+                    "--command",
+                    $service->{method_name},
+                    "--param_file",
+                    "@".$fname,
+                    "--ws_url",
+                    $self->ws_url
+                ));
             }
             # run given cmd
             else {
@@ -525,6 +542,7 @@ sub _post_shock_file {
 }
 
 # treat array as json array
+# this is for service mode
 sub _hashify_args {
     my ($self, $params) = @_;
     my $arg_hash = {};
@@ -558,6 +576,7 @@ sub _hashify_args {
 }
 
 # treat array as multiple inputs of same label
+# this is for script mode with workspace input and/or output
 sub _minify_args {
     my ($self, $params) = @_;
     my $arg_min = [];
@@ -574,6 +593,9 @@ sub _minify_args {
         if ($p->{type} eq 'array') {
             my $val_array = $self->json->decode($p->{value});
             foreach my $val (@$val_array) {
+                if (! $val) {
+                    next;
+                }
                 push @$arg_min, {
                     label           => $p->{label},
                     value           => $val,
@@ -597,6 +619,7 @@ sub _minify_args {
     return $arg_min;
 }
 
+# this is for script mode with no workspace input and/or output
 sub _stringify_args {
     my ($self, $params) = @_;
     my $arg_min = $self->_minify_args($params); # use this to unroll arrays

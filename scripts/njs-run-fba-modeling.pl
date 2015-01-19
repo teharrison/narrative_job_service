@@ -8,27 +8,39 @@
 use strict;
 use warnings;
 use JSON::XS;
+use Getopt::Long;
+use Bio::KBase::workspace::ScriptHelpers qw(workspaceURL);
 use Bio::KBase::fbaModelServices::ScriptHelpers qw(fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode );
+
 #Defining globals describing behavior
-my $usage = "Usage:\nnjs-run-fba-modeling <Command name> <Parameters file> <Service URL>\n";
-if (defined($ARGV[0]) && $ARGV[0] eq "-h") {
-	print $usage;
-	exit 0;
+my $command     = "";
+my $param_file  = "parameters.json";
+my $service_url = "http://kbase.us/services/KBaseFBAModeling";
+my $ws_url  = "http://kbase.us/services/ws";
+my $help    = 0;
+my $usage   = "Usage:\nnjs-run-fba-modeling --command <Command name> --param_file <Parameters file> --service_url <Service URL> --ws_url <Workspace URL>\n";
+my $options = GetOptions (
+    "command=s"     => \$command,
+	"param_file=s"  => \$param_file,
+	"service_url=s" => \$service_url,
+	"ws_url=s"      => \$ws_url,
+	"help!"         => \$help
+);
+if ($help){
+    print $usage;
+    exit 0;
 }
-if (!defined($ARGV[0])) {
-	print "[error] missing command\n$usage";
-	exit 1;
+if (! $command) {
+    print STDERR "[error] missing command\n$usage";
+    exit 1;
 }
-if (!defined($ARGV[1])) {
-	$ARGV[1] = "parameters.json";
+if (! -e $param_file) {
+    print STDERR "[error] parameter file is missing\n$usage";
+    exit 1;
 }
-if (!defined($ARGV[2])) {
-	$ARGV[2] = "http://kbase.us/services/KBaseFBAModeling";
-}
-#Selecting command
-my $command = $ARGV[0];
+
 #Loading parameters from file
-open( my $fh, "<", $ARGV[1]);
+open(my $fh, "<", $param_file);
 my $parameters;
 {
     local $/;
@@ -36,9 +48,11 @@ my $parameters;
     $parameters = decode_json $str;
 }
 close($fh);
+
+#Set workspace url
+workspaceURL($ws_url);
 #Retrieving service client or server object
-my $url = $ARGV[2];
-my $fba = get_fba_client($url);
+my $fba = get_fba_client($service_url);
 #Running command
 my $finalparameters = {};
 foreach my $key (keys(%{$parameters})) {

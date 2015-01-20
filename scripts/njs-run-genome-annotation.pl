@@ -114,6 +114,8 @@ if (defined($parameters->{input_contigset})) {
 		});
 	}
 	$contigsetref = $objdatas->[0]->{info}->[6]."/".$objdatas->[0]->{info}->[0]."/".$objdatas->[0]->{info}->[4];	
+}elsif(!defined($inputgenome->{contigs})){
+    $inputgenome->{contigs} = [];
 }
 my $gaserv;
 if ($service_url eq "impl") {

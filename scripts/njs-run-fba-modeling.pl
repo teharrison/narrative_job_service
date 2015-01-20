@@ -85,6 +85,16 @@ foreach my $key (keys(%{$parameters})) {
 		}
 	}
 }
+if ($command eq "runfba" && !defined($finalparameters->{formulation}->{media})) {
+	$finalparameters->{formulation}->{media} = "Complete";
+	$finalparameters->{formulation}->{media_workspace} = "KBaseMedia";
+}
+if ($command eq "gapfill_model" && !defined($finalparameters->{formulation}->{formulation}->{media})) {
+	$finalparameters->{formulation}->{formulation}->{media} = "Complete";
+	$finalparameters->{formulation}->{formulation}->{media_workspace} = "KBaseMedia";
+}
+
+
 my $output = $fba->$command($finalparameters);
 my $JSON = JSON->new->utf8(1);
 print STDOUT $JSON->encode($output);

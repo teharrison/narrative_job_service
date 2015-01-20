@@ -116,8 +116,9 @@ sub readConfig {
     # get service wrapper info
     my @services = @{$cfg->{'supported_services'}};
     my @wrappers = @{$cfg->{'service_wrappers'}};
+    my @urls = @{$cfg->{'supported_urls'}};
     for (my $i=0; $i<@services; $i++) {
-        $self->{'service_wrappers'}->{$services[$i]} = $wrappers[$i];
+        $self->{'service_wrappers'}->{$services[$i]} = { 'script' => $wrappers[$i], 'url' => $urls[$i] };
     }
 }
 
@@ -229,7 +230,7 @@ sub compose_app {
             my $arg_hash = $self->_hashify_args($step->{parameters});
             my $input_hash = $self->_post_shock_file($in_attr, $arg_hash, $fname);
             $task_vars->{inputs}   = '"inputs": '.$self->json->encode($input_hash).",\n";
-            $task_vars->{cmd_name} = $self->service_wrappers->{$service->{service_name}};
+            $task_vars->{cmd_name} = $self->service_wrappers->{$service->{service_name}}{script};
             $task_vars->{arg_list} = join(" ", (
                 "--command",
                 $service->{method_name},
@@ -238,8 +239,11 @@ sub compose_app {
                 "--ws_url",
                 $self->ws_url
             ));
+            # use url passed in app, else use url in config
             if ($service->{service_url}) {
                 $task_vars->{arg_list} .= "--service_url ".$service->{service_url};
+            } else {
+                $task_vars->{arg_list} .= "--service_url ".$self->service_wrappers->{$service->{service_name}}{url};
             }
         }
         # script step

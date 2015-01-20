@@ -333,7 +333,7 @@ sub check_app_state {
         }
     }
     # log it if completed
-    if ($output->{job_state} eq 'completed') {
+    if (($output->{job_state} eq 'completed') || ($output->{job_state} eq 'suspend')) {
         my $job_dir = $self->log_dir."/log/".$output->{job_id};
         unless (-d $job_dir) {
             mkdir($job_dir);

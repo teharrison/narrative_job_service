@@ -294,11 +294,21 @@ sub check_app_state {
     my $output = {
         job_id          => $job->{id},
         job_state       => $job->{state},
+        submit_time     => $job->{submittime},
+        start_time      => "",
+        complete_time   => "",
         position        => 0,
         running_step_id => "",
         step_outputs    => {},
         step_errors     => {}
     };
+    # get timestamps
+    if ($job->{startedtime} && ($job->{startedtime} ne '0001-01-01T00:00:00Z')) {
+        $output->{start_time} = $job->{startedtime};
+    }
+    if ($job->{completedtime} && ($job->{completedtime} ne '0001-01-01T00:00:00Z')) {
+        $output->{complete_time} = $job->{completedtime};
+    }
     # get position
     my $result = $self->_awe_action('job', $job_id, 'get', 'position');
     if (ref($result) && (ref($result) eq 'HASH')) {

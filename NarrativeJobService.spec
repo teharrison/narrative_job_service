@@ -67,8 +67,11 @@ module NarrativeJobService {
 
     /*
         job_id - id of job running app
-        job_state - 'queued', 'running', 'completed', or 'error'
-        position - position of job in the queue
+        job_state - 'queued', 'in-progress', 'completed', or 'suspend'
+        position - position of job in the queue, '0' indicates not enqueued: init, suspend, completed
+        submit_time - ISO8601 datetime formatted string of submission to queue
+        start_time - ISO8601 datetime formatted string of start of job step, may be empty string id not started
+        complete_time - SO8601 datetime formatted string of completion of job, may be empty string if not completed
         running_step_id - id of step currently running
         step_outputs - mapping step_id to stdout text produced by step, only for completed or errored steps
         step_outputs - mapping step_id to stderr text produced by step, only for completed or errored steps
@@ -76,6 +79,9 @@ module NarrativeJobService {
     typedef structure {
         string job_id;
         string job_state;
+        string submit_time;
+        string start_time;
+        string complete_time;
         int position;
         string running_step_id;
         mapping<string, string> step_outputs;

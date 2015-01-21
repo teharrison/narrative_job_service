@@ -241,9 +241,9 @@ sub compose_app {
             ));
             # use url passed in app, else use url in config
             if ($service->{service_url}) {
-                $task_vars->{arg_list} .= "--service_url ".$service->{service_url};
+                $task_vars->{arg_list} .= " --service_url ".$service->{service_url};
             } else {
-                $task_vars->{arg_list} .= "--service_url ".$self->service_wrappers->{$service->{service_name}}{url};
+                $task_vars->{arg_list} .= " --service_url ".$self->service_wrappers->{$service->{service_name}}{url};
             }
         }
         # script step

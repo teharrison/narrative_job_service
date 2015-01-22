@@ -94,9 +94,5 @@ if ($command eq "gapfill_model" && !defined($finalparameters->{formulation}->{fo
 }
 my $JSON = JSON->new->utf8(1);
 
-if ($command eq "build_pangenome") {
-	print STDOUT $JSON->encode($finalparameters);
-} else {
-	my $output = $fba->$command($finalparameters);
-	print STDOUT $JSON->encode($output);
-}
+my $output = $fba->$command($finalparameters);
+print STDOUT $JSON->encode($output);

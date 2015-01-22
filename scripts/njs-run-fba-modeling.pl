@@ -77,9 +77,9 @@ foreach my $key (keys(%{$parameters})) {
 			delete $finalparameters->{community_submodel_ids};
 		}
 		if ($key =~ m/workspaces$/) {
-			my $idkey = $finalparameters->{$key};
+			my $idkey = $parameters->{$key};
 			$finalparameters->{$key} = [];
-			for (my $i=0; $i < @{$finalparameters->{$idkey}}; $i++) {
+			for (my $i=0; $i < @{$parameters->{$idkey}}; $i++) {
 				push(@{$finalparameters->{$key}},$finalparameters->{workspace});
 			}
 		}

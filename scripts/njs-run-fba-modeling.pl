@@ -76,11 +76,10 @@ foreach my $key (keys(%{$parameters})) {
 			}
 			delete $finalparameters->{community_submodel_ids};
 		}
-		if ($key =~ m/workspaces$/) {
-			my $idkey = $parameters->{$key};
-			$finalparameters->{$key} = [];
-			for (my $i=0; $i < @{$parameters->{$idkey}}; $i++) {
-				push(@{$finalparameters->{$key}},$finalparameters->{workspace});
+		if ($key eq "genome_workspaces") {
+			$finalparameters->{genome_workspaces} = [];
+			for (my $i=0; $i < @{$parameters->{genomes}}; $i++) {
+				push(@{$finalparameters->{genome_workspaces}},$parameters->{workspace});
 			}
 		}
 	}

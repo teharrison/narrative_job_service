@@ -92,8 +92,10 @@ if ($command eq "gapfill_model" && !defined($finalparameters->{formulation}->{fo
 	$finalparameters->{formulation}->{formulation}->{media} = "Complete";
 	$finalparameters->{formulation}->{formulation}->{media_workspace} = "KBaseMedia";
 }
+my $JSON = JSON->new->utf8(1);
 
+print STDOUT $JSON->encode($finalparameters)."\n";
 
 my $output = $fba->$command($finalparameters);
-my $JSON = JSON->new->utf8(1);
+
 print STDOUT $JSON->encode($output);

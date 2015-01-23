@@ -10,7 +10,7 @@ use warnings;
 use JSON::XS;
 use Getopt::Long;
 use Bio::KBase::workspace::ScriptHelpers qw(workspaceURL);
-use Bio::KBase::fbaModelServices::ScriptHelpers qw(fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode );
+use Bio::KBase::fbaModelServices::ScriptHelpers qw(get_workspace_object fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode );
 
 #Defining globals describing behavior
 my $command     = "";
@@ -55,6 +55,7 @@ workspaceURL($ws_url);
 my $fba = get_fba_client($service_url);
 #Running command
 my $finalparameters = {};
+my $genomeset;
 foreach my $key (keys(%{$parameters})) {
 	if (length($parameters->{$key}) > 0) {
 		my $array = [split(/:/,$key)];
@@ -76,12 +77,42 @@ foreach my $key (keys(%{$parameters})) {
 			}
 			delete $finalparameters->{community_submodel_ids};
 		}
-		if ($key eq "genome_workspaces") {
+		if ($key eq "genome_workspaces" && defined($parameters->{genomes})) {
 			$finalparameters->{genome_workspaces} = [];
 			for (my $i=0; $i < @{$parameters->{genomes}}; $i++) {
 				push(@{$finalparameters->{genome_workspaces}},$parameters->{workspace});
 			}
 		}
+		if ($key eq "pangenome_set") {
+			($genomeset,my $info) = get_workspace_object($parameters->{workspace}."/".$finalparameters->{$key});
+		}
+	}
+}
+if (defined($genomeset)) {
+	my $hash;
+	my $count = 0;
+	if (defined($finalparameters->{genomes})) {
+		for (my $i=0; $i < @{$finalparameters->{genome_workspaces}}; $i++) {
+			if (!defined($hash->{$finalparameters->{genome_workspaces}->[$i]."/".$finalparameters->{genomes}->[$i]})) {
+				$hash->{$finalparameters->{genome_workspaces}->[$i]."/".$finalparameters->{genomes}->[$i]} = $count;
+				$count++;
+			}
+		}
+	}
+	foreach my $key (keys(%{$genomeset->{"elements"}})) {
+		my $ref = $genomeset->{"elements"}->{$key}->{"ref"};
+		my $array = [split(/\//,$ref)];
+		if (!defined($hash->{$array->[0]."/".$array->[1]})) {
+			$hash->{$array->[0]."/".$array->[1]} = $count;
+			$count++;
+		}
+	}
+	$finalparameters->{genomes} = [];
+	$finalparameters->{genome_workspaces} = [];
+	foreach my $item (keys(%{$hash})) {
+		my $array = [split(/\//,$item)];
+		push(@{$finalparameters->{genomes}},$array->[1]);
+		push(@{$finalparameters->{genome_workspaces}},$array->[0]);
 	}
 }
 if ($command eq "runfba" && !defined($finalparameters->{formulation}->{media})) {
@@ -93,6 +124,6 @@ if ($command eq "gapfill_model" && !defined($finalparameters->{formulation}->{fo
 	$finalparameters->{formulation}->{formulation}->{media_workspace} = "KBaseMedia";
 }
 my $JSON = JSON->new->utf8(1);
-
+print STDOUT $JSON->encode($finalparameters);
 my $output = $fba->$command($finalparameters);
 print STDOUT $JSON->encode($output);

@@ -525,7 +525,7 @@ sub _get_shock_file {
     } else {
         my $message = "[shock error] ".$response->code." ".$response->message;
         eval {
-            $json = $self->json->decode( $response->content );
+            my $json = $self->json->decode( $response->content );
             if (exists($json->{error}) && $json->{error}) {
                 $message = "[shock error] ".$json->{status}." ".$json->{error}[0];
             }

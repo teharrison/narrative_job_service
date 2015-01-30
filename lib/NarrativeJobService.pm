@@ -31,9 +31,11 @@ sub new {
 	    ws_url    => $ENV{'WS_SERVER_URL'},
 		awe_url   => $ENV{'AWE_SERVER_URL'},
 		shock_url => $ENV{'SHOCK_SERVER_URL'},
-		client_group     => $ENV{'AWE_CLIENT_GROUP'},
-		script_wrapper   => undef,
-		service_wrappers => {},
+		client_group       => $ENV{'AWE_CLIENT_GROUP'},
+		script_wrapper     => undef,
+		service_wrappers   => {},
+		service_auth_name  => "",
+		service_auth_token => ""
 	};
 
 	bless $self, $class;
@@ -84,6 +86,14 @@ sub service_wrappers {
     my ($self) = @_;
     return $self->{'service_wrappers'};
 }
+sub service_auth_name {
+    my ($self) = @_;
+    return $self->{'service_auth_name'};
+}
+sub service_auth_token {
+    my ($self) = @_;
+    return $self->{'service_auth_token'};
+}
 
 # replace object variables from config if don't exit
 sub readConfig {
@@ -97,7 +107,7 @@ sub readConfig {
     my $cfg_full = Config::Simple->new($conf_file);
     my $cfg = $cfg_full->param(-block=>'narrative_job_service');
     # get values
-    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper')) {
+    foreach my $val (('ws_url', 'awe_url', 'shock_url', 'client_group', 'script_wrapper', 'service_auth_name', 'service_auth_token')) {
         unless (defined $self->{$val} && $self->{$val} ne '') {
             $self->{$val} = $cfg->{$val};
             unless (defined($self->{$val}) && $self->{$val} ne "") {
@@ -138,6 +148,8 @@ sub run_app {
     my $workflow = $self->compose_app($app, $user_name);
     # submit workflow
     my $job = $self->_post_awe_workflow($workflow);
+    # add this service to read ACL
+    $self->_awe_action('job', $job->{id}.'/acl/read', 'put', 'users='.$self->service_auth_name);
     # event log
     $self->_log_event("run_app", "job ".$job->{id}." created for app ".$app->{name});
     # get app info
@@ -424,6 +436,8 @@ sub _awe_action {
             $req->method('PUT');
             $tmp = $self->agent->request($req);
         } elsif ($action eq 'get') {
+            # use service token for GET requests
+            @args = ('Authorization', 'OAuth '.$self->service_auth_token);
             $tmp = $self->agent->get($url, @args);
         }
         $response = $self->json->decode( $tmp->content );
@@ -503,16 +517,22 @@ sub _get_shock_file {
         die "[shock error] ".($@ || "unable to connect to Shock server").":";
     }
     
-    # if return is json encoded get error
-    eval {
-        my $json = $self->json->decode( $response->content );
-        if (exists($json->{error}) && $json->{error}) {
-            print STDERR "[shock error] ".$json->{error}[0]."\n";
-            die "[shock error] ".$json->{error}[0].":";
-        }
-    };
-    # get content
-    return $response->content;
+    # check response code, skip 401 and throw error on rest
+    if ($response->code == 200) {
+        return $response->content;
+    } elsif ($response->code == 401) {
+        return "";
+    } else {
+        my $message = "[shock error] ".$response->code." ".$response->message;
+        eval {
+            my $json = $self->json->decode( $response->content );
+            if (exists($json->{error}) && $json->{error}) {
+                $message = "[shock error] ".$json->{status}." ".$json->{error}[0];
+            }
+        };
+        print STDERR $message."\n";
+        die $message.":";
+    }
 }
 
 sub _post_shock_file {

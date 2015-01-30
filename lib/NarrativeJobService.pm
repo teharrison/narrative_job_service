@@ -457,6 +457,10 @@ sub _awe_action {
         if ($err =~ /^log type .* not found$/) {
             return "";
         }
+        # special exception for lost workunit
+        if ($err =~ /^no workunit found$/) {
+            return "";
+        }
         # special exception for position query
         if ($options && ($options eq 'position')) {
             return {"position" => 0};

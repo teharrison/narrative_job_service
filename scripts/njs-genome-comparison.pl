@@ -8,36 +8,47 @@
 use strict;
 use warnings;
 use JSON::XS;
+use Getopt::Long;
 use GenomeComparisonClient;
 use Bio::KBase::userandjobstate::Client;
-use Bio::KBase::fbaModelServices::ScriptHelpers qw(fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode );
+use Bio::KBase::workspace::ScriptHelpers qw(workspaceURL get_ws_client);
+use Bio::KBase::fbaModelServices::ScriptHelpers qw(fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode);
+
 #Defining globals describing behavior
-my $usage = "Usage:\nnjs-genome-comparison <Command name> <Parameters file> <Service URL> <UJS URL>\n";
-if (defined($ARGV[0]) && $ARGV[0] eq "-h") {
-	print $usage;
-	exit 0;
+my $command     = "";
+my $param_file  = "parameters.json";
+my $service_url = "https://kbase.us/services/genome_comparison/jsonrpc";
+my $ws_url  = "http://kbase.us/services/ws";
+my $ujs_url = "https://kbase.us/services/userandjobstate";
+my $help    = 0;
+my $usage   = "Usage:\nnjs-genome-comparison --command <Command name> --param_file <Parameters file> --service_url <Service URL> --ws_url <Workspace URL> --ujs_url <User and Job State URL>\n";
+my $options = GetOptions (
+    "command=s"     => \$command,
+	"param_file=s"  => \$param_file,
+	"service_url=s" => \$service_url,
+	"ws_url=s"      => \$ws_url,
+	"ujs_url=s"     => \$ujs_url,
+	"help!"         => \$help
+);
+if ($help){
+    print $usage;
+    exit 0;
 }
-if (!defined($ARGV[0])) {
-	print "[error] missing command\n$usage";
-	exit 1;
+if (! $command) {
+    print STDERR "[error] missing command\n$usage";
+    exit 1;
 }
-if (!defined($ARGV[1])) {
-	$ARGV[1] = "parameters.json";
+if ($command ne "blast_proteomes") {
+    print STDERR "[error] command '$command' is not supported\n$usage";
+    exit 1;
 }
-if (!defined($ARGV[2])) {
-	$ARGV[2] = "https://kbase.us/services/genome_comparison/jsonrpc";
+if (! -e $param_file) {
+    print STDERR "[error] parameter file is missing\n$usage";
+    exit 1;
 }
-if (!defined($ARGV[3])) {
-	$ARGV[3] = "https://kbase.us/services/userandjobstate";
-}
-#Selecting command
-my $command = $ARGV[0];
-if ($ARGV[0] ne "blast_proteomes") {
-	print "[error] command $command not supported!\n";
-	exit 1;
-}
+
 #Loading parameters from file
-open( my $fh, "<", $ARGV[1]);
+open(my $fh, "<", $param_file);
 my $parameters;
 {
     local $/;
@@ -45,9 +56,11 @@ my $parameters;
     $parameters = decode_json $str;
 }
 close($fh);
+
+#Set workspace url
+workspaceURL($ws_url);
 #Retrieving service client or server object
-my $url = $ARGV[2];
-my $GenComp = GenomeComparisonClient->new($url);
+my $GenComp = GenomeComparisonClient->new($service_url);
 #Running command
 my $finalparameters = {};
 foreach my $key (keys(%{$parameters})) {
@@ -67,7 +80,7 @@ foreach my $key (keys(%{$parameters})) {
 	}
 }
 my $jobid = $GenComp->$command($finalparameters);
-my $ujs = Bio::KBase::userandjobstate::Client->new($ARGV[3]);
+my $ujs = Bio::KBase::userandjobstate::Client->new($ujs_url);
 my $jobinfo = $ujs->get_job_info($jobid);
 my $continue = 1;
 while ($continue) {

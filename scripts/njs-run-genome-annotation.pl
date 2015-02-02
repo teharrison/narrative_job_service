@@ -32,8 +32,12 @@ if ($help){
     print $usage;
     exit 0;
 }
+if (! $command) {
+    print STDERR "[error] missing command\n$usage";
+    exit 1;
+}
 if ($command ne "annotate_genome") {
-    print STDERR "[error] only command 'annotate_genome' is currently supported\n$usage";
+    print STDERR "[error] command '$command' is not supported\n$usage";
     exit 1;
 }
 if (! -e $param_file) {

@@ -8,6 +8,7 @@
 use strict;
 use warnings;
 use JSON::XS;
+use Getopt::Long;
 use GenomeComparisonClient;
 use Bio::KBase::userandjobstate::Client;
 use Bio::KBase::workspace::ScriptHelpers qw(workspaceURL get_ws_client);

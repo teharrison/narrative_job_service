@@ -58,7 +58,7 @@ my $finalparameters = {};
 my $genomeset;
 my $modelset;
 foreach my $key (keys(%{$parameters})) {
-	if (length($parameters->{$key}) > 0) {
+	if (defined($parameters->{$key}) && length($parameters->{$key}) > 0) {
 		my $array = [split(/:/,$key)];
 		my $current = $finalparameters;
 		for (my $i = 0; $i < @{$array}; $i++) {

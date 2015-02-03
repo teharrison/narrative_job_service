@@ -306,7 +306,7 @@ sub check_app_state {
     my $output = {
         job_id          => $job->{id},
         job_state       => $job->{state},
-        submit_time     => $job->{submittime},
+        submit_time     => $job->{info}{submittime},
         start_time      => "",
         complete_time   => "",
         position        => 0,
@@ -315,11 +315,11 @@ sub check_app_state {
         step_errors     => {}
     };
     # get timestamps
-    if ($job->{startedtime} && ($job->{startedtime} ne '0001-01-01T00:00:00Z')) {
-        $output->{start_time} = $job->{startedtime};
+    if ($job->{info}{startedtime} && ($job->{info}{startedtime} ne '0001-01-01T00:00:00Z')) {
+        $output->{start_time} = $job->{info}{startedtime};
     }
-    if ($job->{completedtime} && ($job->{completedtime} ne '0001-01-01T00:00:00Z')) {
-        $output->{complete_time} = $job->{completedtime};
+    if ($job->{info}{completedtime} && ($job->{info}{completedtime} ne '0001-01-01T00:00:00Z')) {
+        $output->{complete_time} = $job->{info}{completedtime};
     }
     # get position
     my $result = $self->_awe_action('job', $job_id, 'get', 'position');

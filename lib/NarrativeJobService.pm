@@ -454,11 +454,11 @@ sub _awe_action {
     } elsif (exists($response->{error}) && $response->{error}) {        
         my $err = $response->{error}[0];
         # special exception for empty stdout / stderr
-        if ($err =~ /^log type .* not found$/) {
+        if ($err =~ /log type \S+ not found/) {
             return "";
         }
         # special exception for lost workunit
-        if ($err =~ /^no workunit found$/) {
+        if ($err =~ /no workunit found/) {
             return "";
         }
         # special exception for position query
@@ -466,7 +466,7 @@ sub _awe_action {
             return {"position" => 0};
         }
         # make message more useful
-        elsif ($err eq "Not Found") {
+        if ($err eq "Not Found") {
             $err = "$type $id does not exist";
         }
         print STDERR "[awe error] ".$err."\n";

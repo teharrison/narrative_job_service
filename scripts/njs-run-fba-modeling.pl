@@ -52,6 +52,9 @@ close($fh);
 #Set workspace url
 workspaceURL($ws_url);
 #Retrieving service client or server object
+if (defined($parameters->{localmode}) && $parameters->{localmode} == 1) {
+	$service_url = "impl";
+}
 my $fba = get_fba_client($service_url);
 #Running command
 my $finalparameters = {};

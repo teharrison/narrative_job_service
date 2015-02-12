@@ -52,10 +52,14 @@ close($fh);
 #Set workspace url
 workspaceURL($ws_url);
 #Retrieving service client or server object
+my $fba;
 if (defined($parameters->{localmode}) && $parameters->{localmode} == 1) {
-	$service_url = "impl";
+	$Bio::KBase::fbaModelServices::Server::CallContext = {token => $ENV{KB_AUTH_TOKEN}};
+	require "Bio/KBase/fbaModelServices/Impl.pm";
+	$fba = Bio::KBase::fbaModelServices::Impl->new({"workspace-url" => workspaceURL()});
+} else {
+	$fba = get_fba_client($service_url);
 }
-my $fba = get_fba_client($service_url);
 #Running command
 my $finalparameters = {};
 my $genomeset;

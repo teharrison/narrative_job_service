@@ -10,7 +10,7 @@ use warnings;
 use JSON::XS;
 use Getopt::Long;
 use Bio::KBase::workspace::ScriptHelpers qw(workspaceURL get_ws_client);
-use Bio::KBase::fbaModelServices::ScriptHelpers qw(get_workspace_object fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode );
+use Bio::KBase::fbaModelServices::ScriptHelpers qw(getToken get_workspace_object fbaws printJobData get_fba_client runFBACommand universalFBAScriptCode );
 
 #Defining globals describing behavior
 my $command     = "";
@@ -53,13 +53,13 @@ close($fh);
 workspaceURL($ws_url);
 #Retrieving service client or server object
 my $fba;
-if (defined($parameters->{localmode}) && $parameters->{localmode} == 1) {
+#if (defined($parameters->{localmode}) && $parameters->{localmode} == 1) {
 	$Bio::KBase::fbaModelServices::Server::CallContext = {token => $ENV{KB_AUTH_TOKEN}};
 	require "Bio/KBase/fbaModelServices/Impl.pm";
 	$fba = Bio::KBase::fbaModelServices::Impl->new({"workspace-url" => workspaceURL()});
-} else {
-	$fba = get_fba_client($service_url);
-}
+#} else {
+#	$fba = get_fba_client($service_url);
+#}
 #Running command
 my $finalparameters = {};
 my $genomeset;
@@ -164,7 +164,13 @@ if ($command eq "gapfill_model" && !defined($finalparameters->{formulation}->{fo
 	$finalparameters->{formulation}->{formulation}->{media_workspace} = "KBaseMedia";
 }
 my $JSON = JSON->new->utf8(1);
-my $output = $fba->$command($finalparameters);
+my $output;
+eval {
+	$output = $fba->$command($finalparameters);
+};
+if (!defined($output)) {
+	die $@;
+}
 if ($command eq "metagenome_to_fbamodels") {
 	my $object = {
 		type => "KBaseFBA.FBAModelSet",

@@ -32,6 +32,7 @@ sub new {
 		awe_url   => $ENV{'AWE_SERVER_URL'},
 		shock_url => $ENV{'SHOCK_SERVER_URL'},
 		client_group       => $ENV{'AWE_CLIENT_GROUP'},
+		client_group_map   => {},
 		script_wrapper     => undef,
 		service_wrappers   => {},
 		service_auth_name  => "",
@@ -78,6 +79,10 @@ sub client_group {
     my ($self) = @_;
     return $self->{'client_group'};
 }
+sub client_group_map {
+    my ($self) = @_;
+    return $self->{'client_group_map'};
+}
 sub script_wrapper {
     my ($self) = @_;
     return $self->{'script_wrapper'};
@@ -121,6 +126,13 @@ sub readConfig {
         $self->{'log_dir'} = $cfg->{'log_dir'};
         unless (-d $self->{'log_dir'}."/log") {
             mkdir($self->{'log_dir'}."/log");
+        }
+    }
+    # client group mapping
+    if (exists($cfg->{'client_group_map'}) && (scalar(@{$cfg->{'client_group_map'}}) > 0)) {
+        foreach my $x (@{$cfg->{'client_group_map'}}) {
+            my ($k, $v) = split(/:/, $x);
+            $self->{'client_group_map'}{$k} = $v;
         }
     }
     # get service wrapper info
@@ -216,7 +228,8 @@ sub compose_app {
             # for now just the previous task
             depends_on => ($tnum > 0) ? '"'.($tnum-1).'"' : "",
             this_task  => $tnum,
-            inputs     => ""
+            inputs     => "",
+            client_group => exists($self->client_group_map->{$service->{service_name}}) ? $self->client_group_map->{$service->{service_name}} : ""
         };
         # shock input attr
         my $in_attr = {
@@ -731,6 +744,7 @@ sub _task_template {
             "data_type": "output",
             "format": "text"
         },
+        "clientgroups": "[% client_group %]",
         "taskid": "[% this_task %]",
         "totalwork": 1
     });
